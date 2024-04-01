@@ -1,7 +1,4 @@
-from card import Card
-
 # Game Specific
-
 CENTER_HEX = 'E4'
 
 def all_units_exhausted(units):
