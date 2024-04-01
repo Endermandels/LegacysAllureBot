@@ -1,4 +1,3 @@
-from card import *
 from toolbox import *
 from random import randint
 
@@ -10,17 +9,13 @@ class Bot():
 		self.board = board
 
 		if self.p1:
-			self.p_units = 'p1 units'
+			self.allied_units = 'p1 units'
+			self.enemy_units = 'p2 units'
+			self.name = '[Bot 1]'
 		else:
-			self.p_units = 'p2 units'
-
-	def __repr__(self):
-		string = ''
-		if self.p1:
-			string = '[Bot 1]'
-		else:
-			string = '[Bot 2]'
-		return string
+			self.allied_units = 'p2 units'
+			self.enemy_units = 'p1 units'
+			self.name = '[Bot 2]'
 
 	def do_action(self):
 		"""
@@ -35,27 +30,13 @@ class Bot():
 		# Decide on best action
 		action = self.decide(actions)
 
-		# Log previous hex before performing action
-		prev_hex = action['unit'].hex
-
 		# Perform action
 		if action['name'] == 'attack':
 			self._attack(action)
-			print(	str(self) + ' ' +
-					action['name'] + ' enemy ' + 
-					str(action['enemy']) + ' with ' +
-					str(action['unit']))
 		elif action['name'] == 'move':
 			self._move(action)
-			print(	str(self) + ' ' +
-					action['name'] + ' from ' +
-					prev_hex + ', ' + 
-					str(action['unit']))
 		else:
 			self._pass(action)
-			print(	str(self) + ' ' +
-					action['name'] + ' ' + 
-					str(action['unit']))
 			return True
 
 		return False
@@ -63,7 +44,7 @@ class Bot():
 	def valid_actions(self):
 		actions = []
 		
-		for unit in self.units[self.p_units]:
+		for unit in self.units[self.allied_units]:
 			if not unit.exhausted:
 				# All units can pass
 				actions.append({'name': 'pass', 'unit': unit})
@@ -104,15 +85,52 @@ class Bot():
 
 	def _attack(self, action):
 		unit = action['unit']
+		enemy = action['enemy']
+
+		print(	self.name + ' Attacked enemy ' +
+				enemy.name + ' on ' + enemy.hex + ' with allied ' +
+				unit.name + ' from ' + unit.hex)
+
+		enemy.attacked_by(unit)
+		if enemy.dead:
+			# Move into enemy unit's hex
+			self.board[unit.hex]['occupying'] = None
+			unit.hex = enemy.hex
+			self.board[unit.hex]['occupying'] = unit
+			print('Killed enemy ' + enemy.name)
+			print('Moved allied ' + unit.name + ' to ' + unit.hex)
+
+			# Remove enemy unit from units
+			self.units[self.enemy_units].remove(enemy)
+		else:
+			print('Enemy ' + enemy.name + ' HP: ' + str(enemy.hp))
+
+			# Receive retaliation damage
+			unit.retaliated_by(enemy)
+
+			if unit.dead:
+				print('Allied ' + unit.name + ' died in retaliation')
+				self.units[self.allied_units].remove(unit)
+			else:
+				print('Allied ' + unit.name + ' HP: ' + str(unit.hp))
+
 
 		action['unit'].exhaust()
 
 	def _move(self, action):
 		unit = action['unit']
+		prev_hex = unit.hex
+
 		self.board[unit.hex]['occupying'] = None
 		unit.hex = action['move'][-1]
 		self.board[unit.hex]['occupying'] = unit
 		unit.exhaust()
 
+		print(	self.name + ' Moved ' + unit.name + ' from ' +
+				prev_hex + ' to ' + unit.hex)
+
 	def _pass(self, action):
-		action['unit'].exhaust()
+		unit = action['unit']
+		unit.exhaust()
+		print(	self.name + ' Passed ' + 
+				unit.name + ' on ' + unit.hex)
