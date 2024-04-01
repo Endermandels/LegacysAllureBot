@@ -1,6 +1,6 @@
 from board import *
-from card import Card
-from card_data import *
+from unit import Unit
+from unit_data import *
 from toolbox import *
 from bot import Bot
 
@@ -9,12 +9,12 @@ def setup(data):
 
 	# P1
 	units['p1 units'] = [
-		Card(SWORDSMAN, 'D2', True, board)
+		Unit(SWORDSMAN, 'E4', True, board)
 	]
 
 	# P2
 	units['p2 units'] = [
-		Card(SWORDSMAN, 'D3', False, board)
+		Unit(SWORDSMAN, 'E3', False, board)
 	]
 
 	data['bot1'] = Bot(units, True, True, board)
@@ -25,7 +25,7 @@ def gameloop(data):
 	bot1 = data['bot1']
 	bot2 = data['bot2']
 
-	_round = 7
+	_round = 1
 	p1_turn = bot1.attacker
 	p1_first_turn = True # Who goes first at the start of next round
 
@@ -60,14 +60,14 @@ def results(data):
 
 	if center_unit:
 		if center_unit.p1:
-			print(str(bot1) + ' wins!')
+			print(bot1.name + ' wins!')
 		else:
-			print(str(bot2) + ' wins!')
+			print(bot2.name + ' wins!')
 	else:
 		if bot1.attacker:
-			print(str(bot2) + ' wins!')
+			print(bot2.name + ' wins!')
 		else:
-			print(str(bot1) + ' wins!')
+			print(bot1.name + ' wins!')
 
 def main():
 	data = {'units': {'p1 units': [], 'p2 units': []}}

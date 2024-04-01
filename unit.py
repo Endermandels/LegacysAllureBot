@@ -1,4 +1,4 @@
-class Card:
+class Unit:
 	def __init__(self, data, _hex, p1, board):
 		# Initial Card Stats
 		self.ATK = data['atk']
@@ -12,6 +12,7 @@ class Card:
 		self.mov = self.MOV
 		self.hp = self.HP
 		self.exhausted = False
+		self.dead = False
 		self.hex = _hex
 
 		self.p1 = p1
@@ -27,6 +28,14 @@ class Card:
 
 	def __repr__(self):
 		return self.name + ' on ' + self.hex
+
+	def attacked_by(self, unit):
+		self.hp -= unit.atk
+		if self.hp <= 0 :
+			self.dead = True
+
+	def retaliated_by(self, unit):
+		self.attacked_by(unit)
 
 	def exhaust(self):
 		self.exhausted = True
