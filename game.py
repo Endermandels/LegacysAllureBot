@@ -27,18 +27,24 @@ def gameloop(data):
 
 	_round = 1
 	p1_turn = bot1.attacker
-	p1_start_of_round = True # Who goes first at the start of next round
+	p1_first_turn = True # Who goes first at the start of next round
 
 	while _round < 8:
 		print()
 		print('--------------- ROUND ' + str(_round) + ' ---------------')
 		print()
 
+		p1_turn = p1_first_turn
+
 		while not all_units_exhausted(units):
 			if p1_turn:
-				bot1.do_action()
+				passed = bot1.do_action()
+				if not passed:
+					p1_first_turn = False
 			else:
-				bot2.do_action()
+				passed = bot2.do_action()
+				if not passed:
+					p1_first_turn = True
 
 			p1_turn = not p1_turn
 			print()

@@ -23,10 +23,14 @@ class Bot():
 		return string
 
 	def do_action(self):
+		"""
+		Returns whether the action was a pass
+		"""
+
 		# Determine valid actions
 		actions = self.valid_actions()
 		if len(actions) < 1:
-			return
+			return False
 
 		# Decide on best action
 		action = self.decide(actions)
@@ -51,7 +55,9 @@ class Bot():
 			print(	str(self) + ' ' +
 					action['name'] + ' ' + 
 					str(action['unit']))
+			return True
 
+		return False
 
 	def valid_actions(self):
 		actions = []
