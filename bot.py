@@ -17,9 +17,9 @@ class Bot():
 	def __repr__(self):
 		string = ''
 		if self.p1:
-			string = 'Bot 1'
+			string = '[Bot 1]'
 		else:
-			string = 'Bot 2'
+			string = '[Bot 2]'
 		return string
 
 	def do_action(self):
@@ -42,13 +42,14 @@ class Bot():
 		if action['name'] == 'attack':
 			self._attack(action)
 			print(	str(self) + ' ' +
-					action['name'] + ' ' + 
+					action['name'] + ' enemy ' + 
+					str(action['enemy']) + ' with ' +
 					str(action['unit']))
 		elif action['name'] == 'move':
 			self._move(action)
 			print(	str(self) + ' ' +
 					action['name'] + ' from ' +
-					prev_hex + ' ' + 
+					prev_hex + ', ' + 
 					str(action['unit']))
 		else:
 			self._pass(action)
@@ -69,36 +70,41 @@ class Bot():
 
 				# Check if unit can Move
 				possible_moves = self.can_move(unit)
-				if len(possible_moves) > 0:
-					for move in possible_moves:
-						actions.append({'name': 'move', 
-										'unit': unit, 
-										'move': move})
+				for move in possible_moves:
+					actions.append({'name': 'move', 
+									'unit': unit, 
+									'move': move})
 
 				# Check if unit can Attack
 				possible_attacks = self.can_attack(unit)
+				for defender in possible_attacks:
+					actions.append({'name': 'attack',
+									'unit': unit,
+									'enemy': defender})
 
 		return actions
 
 	def decide(self, actions):
-		for action in actions:
-			if action['name'] == 'move' and \
-				action['move'][-1] == CENTER_HEX:
-				return action
 		rnd = randint(0, len(actions)-1)
 		return actions[rnd]
 
 	def can_move(self, unit):
 		"""
-		This function returns the possible moves
+		Returns the possible moves
 		TODO: along with metadata for each move
 		"""
 		return generate_paths(self.board, unit)
 
 	def can_attack(self, unit):
-		return None
+		"""
+		Returns the possible attacks
+		TODO: along with the movement metadata
+		"""
+		return attackable_hexes(self.board, unit)
 
 	def _attack(self, action):
+		unit = action['unit']
+
 		action['unit'].exhaust()
 
 	def _move(self, action):
