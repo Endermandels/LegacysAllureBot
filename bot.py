@@ -114,7 +114,6 @@ class Bot():
 			else:
 				print('Allied ' + unit.name + ' HP: ' + str(unit.hp))
 
-
 		action['unit'].exhaust()
 
 	def _move(self, action):
