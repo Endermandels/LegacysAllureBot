@@ -72,3 +72,15 @@ def generate_paths(board, unit):
 	# 	print(path)
 	
 	return all_paths
+
+def enemies_adj_hex(board, _hex, p1):
+	all_enemies = []
+	for h in board[_hex]['adj spaces']:
+		occupying_unit = board[h]['occupying']
+		if occupying_unit and occupying_unit.p1 == p1:
+			all_enemies.append(occupying_unit)
+	return all_enemies
+
+def attackable_hexes(board, unit):
+	# For melee only units
+	return enemies_adj_hex(board, unit.hex, not unit.p1)

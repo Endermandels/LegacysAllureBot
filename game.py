@@ -14,7 +14,7 @@ def setup(data):
 
 	# P2
 	units['p2 units'] = [
-		Card(SWORDSMAN, 'D5', False, board)
+		Card(SWORDSMAN, 'D3', False, board)
 	]
 
 	data['bot1'] = Bot(units, True, True, board)
@@ -25,7 +25,7 @@ def gameloop(data):
 	bot1 = data['bot1']
 	bot2 = data['bot2']
 
-	_round = 1
+	_round = 7
 	p1_turn = bot1.attacker
 	p1_first_turn = True # Who goes first at the start of next round
 
