@@ -1,9 +1,10 @@
-"""Uses Stable-Baselines3 to train agents in the Connect Four environment using invalid action masking.
+"""
+Uses Stable-Baselines3 to train agents in the Legacy's Allure environment using invalid action masking.
 
 For information about invalid action masking in PettingZoo, see https://pettingzoo.farama.org/api/aec/#action-masking
 For more information about invalid action masking in SB3, see https://sb3-contrib.readthedocs.io/en/master/modules/ppo_mask.html
 
-Author: Elliot (https://github.com/elliottower)
+Based on: https://github.com/Farama-Foundation/PettingZoo/blob/master/tutorials/SB3/connect_four/sb3_connect_four_action_mask.py
 """
 import glob
 import os
