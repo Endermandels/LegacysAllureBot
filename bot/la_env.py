@@ -1,7 +1,8 @@
 """ 
 Creates the Legacy's Allure environment for training a deep reinforcement learning model.
 
-Based on: https://github.com/Farama-Foundation/PettingZoo/blob/master/pettingzoo/classic/connect_four/connect_four.py
+Original code created by the Farama Foundation:
+	https://github.com/Farama-Foundation/PettingZoo/blob/master/pettingzoo/classic/connect_four/connect_four.py
 """
 
 # Training libs
