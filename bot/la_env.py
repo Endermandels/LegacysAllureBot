@@ -24,8 +24,16 @@ from game_tools.unit_data import *
 # Number of hexes
 NHEXES = 59
 
-# Action Space = Choose_Unit * (Move + Attack + Pass)
-NACTIONS = NHEXES * (NHEXES + NHEXES + 1)
+# Pickable unit hexes
+NUNITS = NHEXES
+
+# Actions per unit
+NMOVES = NHEXES
+NATTACKS = NHEXES
+NACIONS_PER_UNIT = (NMOVES + NATTACKS + 1)
+
+# Total action space
+NACTION_SPACE = NUNITS * NACIONS_PER_UNIT
 
 def env():
 	env = LA_Env()
@@ -43,12 +51,10 @@ class LA_Env(AECEnv):
 	def __init__(self):
 		super().__init__()
 
-		# Create board???
-
 		self.agents = ["player_0", "player_1"]
 		self.possible_agents = self.agents[:]
 
-		self.action_spaces = {i: spaces.Discrete(NACTIONS) for i in self.agents}
+		self.action_spaces = {i: spaces.Discrete(NACTION_SPACE) for i in self.agents}
 		self.observation_spaces = {
 			i: spaces.Dict(
 				{
@@ -56,7 +62,7 @@ class LA_Env(AECEnv):
 						low=0, high=1, shape=(1,), dtype=np.float64
 					),
 					"action_mask": spaces.Box(
-						low=0, high=1, shape=(NACTIONS,), dtype=np.int8
+						low=0, high=1, shape=(NACTION_SPACE,), dtype=np.int8
 					),
 				}
 			)
@@ -90,7 +96,7 @@ class LA_Env(AECEnv):
 		observation = [0]
 		observation = np.array(observation)
 
-		action_mask = np.zeros(NACTIONS, "int8")
+		action_mask = np.zeros(NACTION_SPACE, "int8")
 		for i in legal_moves:
 			action_mask[i] = 1
 
@@ -103,11 +109,64 @@ class LA_Env(AECEnv):
 		return self.action_spaces[agent]
 
 	def _legal_moves(self):
-		# return [i for i in range(7) if self.board[i] == 0]
-		return [i for i in range(NACTIONS)]
+		return [i for i in range(NACTION_SPACE) if self.valid_move(i)]
+
+	def parse_action(self, action):
+		"""
+		Take an int
+		Return a dict explaining the action
+		"""
+		parsed_action = dict()
+
+		n_unit = action % NUNITS
+		n_action = action % NACIONS_PER_UNIT
+
+		parsed_action['unit'] = self.board.get_unit_at_hex_num(n_unit)
+		parsed_action['hex'] = None
+
+		if n_action == 0:
+			parsed_action['type'] = 'pass'
+		elif n_action < NMOVES:
+			# TODO: Implement different movement paths
+			parsed_action['type'] = 'move'
+			parsed_action['hex'] = self.board.get_hex(n_action - 1) # only true when n_action is 'move'
+		else:
+			# TODO: Implement different attack paths
+			parsed_action['type'] = 'attack'
+			parsed_action['hex'] = self.board.get_hex(n_action - NMOVES - 1) # only true when n_action is 'move'
+
+		return parsed_action
 
 	def valid_move(self, action):
-		# TODO: Implement
+		"""
+		action: int in range(NACTION_SPACE)
+		returns whether the action is legal
+		"""
+		action = self.parse_action(action)
+		unit = action['unit']
+		atype = action['type']
+		_hex = action['hex']
+
+		if not unit or unit.exhausted:
+			return False
+
+		if atype == 'move':
+			destinations = generate_set_destinations(self.board.hexes, unit)
+			if not _hex in destinations:
+				return False
+		elif atype == 'attack':
+			enemy = self.board.hexes[_hex]['occupying']
+			if not enemy:
+				return False
+			enemies = attackable_enemies(self.board.hexes, unit)
+			if not enemy in enemies:
+				return False
+		elif atype == 'pass':
+			return True
+		else:
+			print(f'[ERROR]: Unknown action type resulting from action {action}: {atype}')
+			return False
+
 		return True
 
 	def step(self, action):
@@ -146,12 +205,13 @@ class LA_Env(AECEnv):
 
 		# P1
 		self.units[self.agents[0]] = [
-			Unit(SWORDSMAN, 'D2', True, self.board.hexes)
+			Unit(SWORDSMAN, 'D2', True, self.board.hexes),
+			Unit(SWORDSMAN, 'C3', True, self.board.hexes)
 		]
 
 		# P2
 		self.units[self.agents[1]] = [
-			Unit(SWORDSMAN, 'D5', False, self.board.hexes)
+			Unit(SWORDSMAN, 'D3', False, self.board.hexes)
 		]
 
 		self.round = 1
@@ -169,4 +229,15 @@ class LA_Env(AECEnv):
 		self._agent_selector = agent_selector(self.agents)
 		self.agent_selection = self._agent_selector.reset()
 
-LA_Env() # TODO: Delete
+#__DEBUGGING__#
+
+def test_legal_moves():
+	env = LA_Env() # TODO: Delete
+
+	env.reset()
+	legal_moves = env._legal_moves()
+
+	parsed_moves = []
+	for move in legal_moves:
+		parsed_moves.append(env.parse_action(move)['type'])
+	print(parsed_moves)

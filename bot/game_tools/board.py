@@ -7,6 +7,11 @@ Each hex contains:
 
 class Board():
 	def __init__(self):
+		self.HEX_LIST = []
+		for let in range(9):
+			for num in range(7 - let % 2):
+				self.HEX_LIST.append(chr(65+let) + str(num+1))
+
 		self.hexes = {
 			'A1': {'adj spaces': ['A2', 'B1'], 'buffs': [], 'occupying': None},
 			'A2': {'adj spaces': ['A3', 'B2', 'B1', 'A1'], 'buffs': [], 'occupying': None},
@@ -118,3 +123,9 @@ class Board():
 			'I6': {'adj spaces': ['I7', 'H6', 'H5', 'I5'], 'buffs': [], 'occupying': None},
 			'I7': {'adj spaces': ['H6', 'I6'], 'buffs': [], 'occupying': None}
 		}
+
+	def get_hex(self, nhex):
+		return self.HEX_LIST[nhex]
+
+	def get_unit_at_hex_num(self, nhex):
+		return self.hexes[self.get_hex(nhex)]['occupying']

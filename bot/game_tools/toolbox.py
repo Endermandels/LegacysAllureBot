@@ -60,6 +60,11 @@ def dfs(board, unit, _hex, depth, all_paths, path=[]):
 	path.pop()
 
 def generate_paths(board, unit):
+	"""
+	Returns a list of lists.
+	Each list contains the unit's start hex and all subsequent hexes from that start hex
+	within the unit's movement.
+	"""
 	all_paths = []
 	dfs(board, 
 		unit,
@@ -73,6 +78,21 @@ def generate_paths(board, unit):
 	
 	return all_paths
 
+def generate_set_destinations(board, unit):
+	"""
+	Returns a set containing all possible destinations for a unit.
+	Excludes the unit's starting hex
+	"""
+	paths = generate_paths(board, unit)
+
+	result = set()
+
+	for path in paths:
+		if path[-1] != unit.hex:
+			result.add(path[-1])
+
+	return result
+
 def enemies_adj_hex(board, _hex, p1):
 	all_enemies = []
 	for h in board[_hex]['adj spaces']:
@@ -81,6 +101,6 @@ def enemies_adj_hex(board, _hex, p1):
 			all_enemies.append(occupying_unit)
 	return all_enemies
 
-def attackable_hexes(board, unit):
+def attackable_enemies(board, unit):
 	# For melee only units
 	return enemies_adj_hex(board, unit.hex, not unit.p1)
