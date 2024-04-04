@@ -140,10 +140,25 @@ class LA_Env(AECEnv):
 		self._accumulate_rewards()
 
 	def reset(self, seed=None, options=None):
-		# Reset environment
+		#__RESET ENVIRONMENT__#
 		self.board = Board()
+		self.units = {self.agents[0]: [], self.agents[1]: []}
 
-		# Reset Players
+		# P1
+		self.units[self.agents[0]] = [
+			Unit(SWORDSMAN, 'D2', True, self.board.hexes)
+		]
+
+		# P2
+		self.units[self.agents[1]] = [
+			Unit(SWORDSMAN, 'D5', False, self.board.hexes)
+		]
+
+		self.round = 1
+		self.p1_turn = True
+		self.p1_first_turn = True # Who goes first at the start of next round
+
+		#__RESET PLAYERS__#
 		self.agents = self.possible_agents[:]
 		self.rewards = {i: 0 for i in self.agents}
 		self._cumulative_rewards = {name: 0 for name in self.agents}
@@ -153,3 +168,5 @@ class LA_Env(AECEnv):
 
 		self._agent_selector = agent_selector(self.agents)
 		self.agent_selection = self._agent_selector.reset()
+
+LA_Env() # TODO: Delete

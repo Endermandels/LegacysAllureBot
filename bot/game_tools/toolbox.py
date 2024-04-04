@@ -2,19 +2,22 @@
 CENTER_HEX = 'E4'
 
 def all_units_exhausted(units):
-	for unit in units['p1 units']:
-		if not unit.exhausted:
-			return False
-	for unit in units['p2 units']:
-		if not unit.exhausted:
-			return False
+	"""
+	Receives a dictionary containing both players' units
+	"""
+	for player in units.keys():
+		for unit in units[player]:
+			if not unit.exhausted:
+				return False
 	return True
 
 def end_of_round(units):
-	for unit in units['p1 units']:
-		unit.refresh()
-	for unit in units['p2 units']:
-		unit.refresh()
+	"""
+	Receives a dictionary containing both players' units
+	"""
+	for player in units.keys():
+		for unit in units[player]:
+			unit.refresh()
 
 def has_AP(unit):
 	return 'AP' in unit.passives
@@ -46,7 +49,7 @@ def dfs(board, unit, _hex, depth, all_paths, path=[]):
 			all_paths.append(path.copy())
 	elif has_FLY(unit) or has_PATH(unit):
 		path.append(_hex)
-	elif has_AP(unit) and unit.p1==occupying_unit.p1:
+	elif has_AP(unit) and unit.p1 == occupying_unit.p1:
 		path.append(_hex)
 	else:
 		return
