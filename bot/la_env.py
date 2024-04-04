@@ -30,7 +30,7 @@ NUNITS = NHEXES
 # Actions per unit
 NMOVES = NHEXES
 NATTACKS = NHEXES
-NACIONS_PER_UNIT = (NMOVES + NATTACKS + 1)
+NACIONS_PER_UNIT = (NMOVES + NATTACKS + 1) # +1 for the PASS action
 
 # Total action space
 NACTION_SPACE = NUNITS * NACIONS_PER_UNIT
@@ -121,7 +121,6 @@ class LA_Env(AECEnv):
 		n_unit = action % NUNITS
 		n_action = action % NACIONS_PER_UNIT
 
-		parsed_action['unit'] = self.board.get_unit_at_hex_num(n_unit)
 		parsed_action['hex'] = None
 
 		if n_action == 0:
@@ -134,6 +133,8 @@ class LA_Env(AECEnv):
 			# TODO: Implement different attack paths
 			parsed_action['type'] = 'attack'
 			parsed_action['hex'] = self.board.get_hex(n_action - NMOVES - 1) # only true when n_action is 'move'
+
+		parsed_action['unit'] = self.board.get_unit_at_hex_num(n_unit)
 
 		return parsed_action
 
@@ -239,5 +240,24 @@ def test_legal_moves():
 
 	parsed_moves = []
 	for move in legal_moves:
-		parsed_moves.append(env.parse_action(move)['type'])
-	print(parsed_moves)
+		parsed_moves.append(env.parse_action(move))
+	sorted_list = sorted(parsed_moves, key=lambda d: str(d['unit']))
+
+	unit_lists = []
+	num_unit_lists = -1
+
+	prev_unit = None
+	for action in sorted_list:
+		if prev_unit != action['unit']:
+			prev_unit = action['unit']
+			unit_lists.append([])
+			num_unit_lists += 1
+		unit_lists[num_unit_lists].append(action)
+
+	for unit_list in unit_lists:
+		sorted_unit_list = sorted(unit_list, key=lambda d: str(d['hex']))
+		for action in sorted_unit_list:
+			print(action)
+		print()
+
+test_legal_moves()
