@@ -20,6 +20,7 @@ from game_tools.board import *
 from game_tools.toolbox import *
 from game_tools.unit import *
 from game_tools.unit_data import *
+from game_tools.action import *
 
 # Number of hexes
 NHEXES = 59
@@ -108,6 +109,9 @@ class LA_Env(AECEnv):
 	def action_space(self, agent):
 		return self.action_spaces[agent]
 
+	def is_p0_agent(self):
+		return self._agent_selector.selected_agent == 'player_0'
+
 	def _legal_moves(self):
 		return [i for i in range(NACTION_SPACE) if self.valid_move(i)]
 
@@ -122,6 +126,15 @@ class LA_Env(AECEnv):
 		n_action = action % NACIONS_PER_UNIT
 
 		parsed_action['hex'] = None
+		parsed_action['type'] = None
+		parsed_action['unit'] = None
+
+		# If unit either does not exist, is exhausted, or is an enemy unit, invalid move
+		unit = self.board.get_unit_at_hex_num(n_unit)
+		if not unit or unit.exhausted or self.is_p0_agent() != unit.p0:
+			return parsed_action
+		
+		parsed_action['unit'] = unit
 
 		if n_action == 0:
 			parsed_action['type'] = 'pass'
@@ -134,8 +147,6 @@ class LA_Env(AECEnv):
 			parsed_action['type'] = 'attack'
 			parsed_action['hex'] = self.board.get_hex(n_action - NMOVES - 1) # only true when n_action is 'move'
 
-		parsed_action['unit'] = self.board.get_unit_at_hex_num(n_unit)
-
 		return parsed_action
 
 	def valid_move(self, action):
@@ -144,31 +155,48 @@ class LA_Env(AECEnv):
 		returns whether the action is legal
 		"""
 		action = self.parse_action(action)
-		unit = action['unit']
-		atype = action['type']
 		_hex = action['hex']
+		atype = action['type']
+		unit = action['unit']
 
-		if not unit or unit.exhausted:
+		if not unit:
 			return False
 
 		if atype == 'move':
 			destinations = generate_set_destinations(self.board.hexes, unit)
-			if not _hex in destinations:
-				return False
-		elif atype == 'attack':
+			return _hex in destinations
+		if atype == 'attack':
 			enemy = self.board.hexes[_hex]['occupying']
 			if not enemy:
 				return False
 			enemies = attackable_enemies(self.board.hexes, unit)
-			if not enemy in enemies:
-				return False
-		elif atype == 'pass':
+			return enemy in enemies
+		if atype == 'pass':
 			return True
-		else:
-			print(f'[ERROR]: Unknown action type resulting from action {action}: {atype}')
-			return False
 
-		return True
+		print(f'[ERROR]: Unknown action type resulting from action {action}: {atype}')
+		return False
+
+	def perform_action(self, action):
+		"""
+		Takes in a parsed action dict.
+		Returns whether the agent passed with a unit.
+		"""
+		print(f'[{self._agent_selector.selected_agent}] Turn')
+
+		_hex = action['hex']
+		atype = action['type']
+		unit = action['unit']
+
+		if atype == 'move':
+			move_unit(unit, _hex, self.board.hexes)
+		elif atype == 'attack':
+			attack_unit(unit, self.board.hexes[_hex], self.board.hexes, self.units)
+		elif atype == 'pass':
+			pass_unit(unit)
+			return True
+
+		return False
 
 	def step(self, action):
 		if self.truncations[self.agent_selection] or \
@@ -178,20 +206,39 @@ class LA_Env(AECEnv):
 		# Assert valid move
 		assert self.valid_move(action), "played illegal move."
 
-		# Update board state
-		# TODO
-
 		# Get Next Player
 		next_agent = self._agent_selector.next()
 
-		# winner = self.check_for_winner()
-		winner = True # TODO: Delete
+		#________________Update board state________________#
 
-		# check if there is a winner
-		if winner:
-			self.rewards[self.agent_selection] += 1
-			self.rewards[next_agent] -= 1
-			self.terminations = {i: True for i in self.agents}
+		# If all units exhausted
+		if all_units_exhausted(self.board.hexes):
+			# Go to next round
+			end_of_round(self.board.hexes)
+			self.round += 1
+
+			# winner = self.check_for_winner()
+			winner = True # TODO: Delete
+			if winner:
+				# TODO: Rework rewards
+				self.rewards[self.agent_selection] += 1
+				self.rewards[next_agent] -= 1
+				self.terminations = {i: True for i in self.agents}
+
+				# Accumulate Rewards
+				self._accumulate_rewards()
+				return
+
+			# Check if current player goes first
+			if self.p0_first_turn != self.is_p0_agent():
+				# Switch Player
+				self.agent_selection = next_agent
+				return
+
+		# Player makes a move
+		passed = self.perform_action(self.parse_action(action))
+		if passed:
+			self.p0_first_turn = self.is_p0_agent()
 
 		# Switch Player
 		self.agent_selection = next_agent
@@ -200,26 +247,27 @@ class LA_Env(AECEnv):
 		self._accumulate_rewards()
 
 	def reset(self, seed=None, options=None):
-		#__RESET ENVIRONMENT__#
-		self.board = Board()
-		self.units = {self.agents[0]: [], self.agents[1]: []}
+		#_________________RESET ENVIRONMENT_________________#
 
-		# P1
+		self.board = Board()
+		self.units = {True: [], False: []}
+
+		# P0
 		self.units[self.agents[0]] = [
 			Unit(SWORDSMAN, 'D2', True, self.board.hexes),
 			Unit(SWORDSMAN, 'C3', True, self.board.hexes)
 		]
 
-		# P2
+		# P1
 		self.units[self.agents[1]] = [
 			Unit(SWORDSMAN, 'D3', False, self.board.hexes)
 		]
 
 		self.round = 1
-		self.p1_turn = True
-		self.p1_first_turn = True # Who goes first at the start of next round
+		self.p0_first_turn = True # Who goes first at the start of next round
 
-		#__RESET PLAYERS__#
+		#_________________RESET PLAYERS_________________#
+
 		self.agents = self.possible_agents[:]
 		self.rewards = {i: 0 for i in self.agents}
 		self._cumulative_rewards = {name: 0 for name in self.agents}
@@ -230,7 +278,7 @@ class LA_Env(AECEnv):
 		self._agent_selector = agent_selector(self.agents)
 		self.agent_selection = self._agent_selector.reset()
 
-#__DEBUGGING__#
+#______________________DEBUGGING______________________#
 
 def test_legal_moves():
 	env = LA_Env() # TODO: Delete
@@ -260,4 +308,6 @@ def test_legal_moves():
 			print(action)
 		print()
 
-test_legal_moves()
+def test_game():
+	pass
+

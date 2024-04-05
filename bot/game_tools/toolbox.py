@@ -49,7 +49,7 @@ def dfs(board, unit, _hex, depth, all_paths, path=[]):
 			all_paths.append(path.copy())
 	elif has_FLY(unit) or has_PATH(unit):
 		path.append(_hex)
-	elif has_AP(unit) and unit.p1 == occupying_unit.p1:
+	elif has_AP(unit) and unit.p0 == occupying_unit.p0:
 		path.append(_hex)
 	else:
 		return
@@ -93,14 +93,18 @@ def generate_set_destinations(board, unit):
 
 	return result
 
-def enemies_adj_hex(board, _hex, p1):
+def enemies_adj_hex(board, _hex, p0):
 	all_enemies = []
 	for h in board[_hex]['adj spaces']:
 		occupying_unit = board[h]['occupying']
-		if occupying_unit and occupying_unit.p1 == p1:
+		if occupying_unit and occupying_unit.p0 == p0:
 			all_enemies.append(occupying_unit)
 	return all_enemies
 
 def attackable_enemies(board, unit):
+	"""
+	Returns a list containing all enemies unit can attack
+	"""
+
 	# For melee only units
-	return enemies_adj_hex(board, unit.hex, not unit.p1)
+	return enemies_adj_hex(board, unit.hex, not unit.p0)
