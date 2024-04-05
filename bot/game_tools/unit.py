@@ -32,6 +32,7 @@ class Unit:
 	def attacked_by(self, unit):
 		self.hp -= unit.atk
 		if self.hp <= 0 :
+			self.hp = 0 # For reward calculations
 			self.dead = True
 
 	def retaliated_by(self, unit):

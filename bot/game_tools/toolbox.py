@@ -1,5 +1,6 @@
-# Game Specific
+from collections import deque
 
+# Game Specific
 
 def all_units_exhausted(units):
 	"""
@@ -39,7 +40,6 @@ def has_PATH(unit):
 def dfs(board, unit, _hex, depth, all_paths, path=[]):
 	"""
 	Alters all_paths with legal paths
-	Returns whether the full path was followed
 	"""
 	occupying_unit = board[_hex]['occupying']
 
@@ -64,6 +64,34 @@ def dfs(board, unit, _hex, depth, all_paths, path=[]):
 		dfs(board, unit, neighbor, depth - 1, all_paths, path)
 
 	path.pop()
+
+def bfs(board, start_hex, dest_hex):
+	"""
+	Returns a shortest path from start_hex to dest_hex
+	Used for calculating the distance from start_hex to dest_hex
+	"""
+	queue = deque([(start_hex, [start_hex])])
+
+	while queue:
+		current_hex, path = queue.popleft()
+		occupying_unit = board[current_hex]['occupying']
+
+		if current_hex == dest_hex:
+			return path
+
+		for neighbor in board[current_hex]['adj spaces']:
+			new_path = path + [neighbor]
+
+			if neighbor == dest_hex:
+				return new_path
+
+			queue.append((neighbor, new_path))
+
+	return []
+
+def dist_to_hex(start_hex, dest_hex, board):
+	path = bfs(board, start_hex, dest_hex)
+	return max(len(path) - 1, 0)
 
 def generate_paths(board, unit):
 	"""

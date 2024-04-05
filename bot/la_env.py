@@ -180,7 +180,7 @@ class LA_Env(AECEnv):
 	def perform_action(self, action):
 		"""
 		Takes in a parsed action dict.
-		Returns whether the agent passed with a unit.
+		Returns a dict with the following information:
 		"""
 		print(f'[{self.agent_selection}] Turn')
 
@@ -188,12 +188,30 @@ class LA_Env(AECEnv):
 		atype = action['type']
 		unit = action['unit']
 
+		# Calculate reward per outcome of each action
 		if atype == 'move':
 			move_unit(unit, _hex, self.board.hexes)
+			dist = dist_to_hex(_hex, self.board.CENTER_HEX, self.board.hexes)
+			self.rewards[self.agent_selection] = 30 - dist**self.round
 		elif atype == 'attack':
-			attack_unit(unit, self.board.hexes[_hex]['occupying'], self.board.hexes, self.units)
+			results = attack_unit(unit, self.board.hexes[_hex]['occupying'], self.board.hexes, self.units)
+			attacker_HP = results['attacker_HP']
+			defender_HP = results['defender_HP']
+			damage_to_attacker = results['damage_to_attacker']
+			damage_to_defender = results['damage_to_defender']
+			
+			# Reward killing enemy, punish killing ally
+			if attacker_HP <= 0:
+				self.rewards[self.agent_selection] -= 30 - (damage_to_defender**2)
+			elif defender_HP <= 0:
+				self.rewards[self.agent_selection] += 100 - (damage_to_attacker**2)
+			else:
+				self.rewards[self.agent_selection] += 20 + (damage_to_defender*2) - (damage_to_attacker**2)
 		elif atype == 'pass':
 			pass_unit(unit)
+			# Usually, first turn is a good thing to have
+			if self.p0_first_turn == self.is_p0_agent():
+				self.rewards[self.agent_selection] += 10
 			return True
 
 		return False
@@ -235,9 +253,9 @@ class LA_Env(AECEnv):
 				winner, loser = self.get_winner()
 				print(f'[{winner}] Wins!\n\n\n')
 				
-				# TODO: Rework rewards
-				self.rewards[winner] += 1
-				self.rewards[loser] -= 1
+				# Rewards
+				self.rewards[winner] += 1000
+				self.rewards[loser] -= 300
 
 				# Stop game
 				self.terminations = {i: True for i in self.agents}
@@ -247,7 +265,8 @@ class LA_Env(AECEnv):
 				return
 
 			# Check if current player goes first
-			if self.p0_first_turn != self.is_p0_agent():
+			if self.p0_first_turn != self.is_p0_agent() and \
+				can_use_unit(self.units, not self.is_p0_agent()):
 				# Switch Player
 				self.agent_selection = self._agent_selector.next()
 		elif can_use_unit(self.units, not self.is_p0_agent()):

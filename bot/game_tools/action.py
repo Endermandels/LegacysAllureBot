@@ -20,6 +20,17 @@ def move_unit(unit, _hex, board):
 	print('Moved ' + unit.name + ' from ' + prev_hex + ' to ' + unit.hex)
 
 def attack_unit(attacker, defender, board, units):
+	"""
+	Attacker attacks defender.
+	Returns a dict containing the following information:
+		Damage dealt to attacker
+		Damage dealt to defender
+		The remaining health of attacker
+		The remaining health of defender
+	"""
+	attacker_HP = attacker.hp
+	defender_HP = defender.hp
+
 	defender.attacked_by(attacker)
 
 	print('Attacked ' + defender.name + ' with ' + attacker.name)
@@ -30,21 +41,31 @@ def attack_unit(attacker, defender, board, units):
 		attacker.hex = defender.hex
 		board[attacker.hex]['occupying'] = attacker
 
-		print('Killed defending ' + defender.name)
+		print('Killed defending ' + str(defender))
 		print('Moved attacking ' + attacker.name + ' to ' + attacker.hex)
 
 		# Remove defender unit from units
 		units[defender.p0].remove(defender)
 	else:
-		print('Defending ' + defender.name + ' HP: ' + str(defender.hp))
+		print('Defending ' + str(defender) + ' HP: ' + str(defender.hp))
 
 		# Receive retaliation damage
 		attacker.retaliated_by(defender)
 
 		if attacker.dead:
-			print('Allied ' + attacker.name + ' died in retaliation')
+			# Remove attacker from board and units
+			board[attacker.hex]['occupying'] = None
 			units[attacker.p0].remove(attacker)
+
+			print('Attacking ' + str(attacker) + ' died in retaliation')
 		else:
-			print('Allied ' + attacker.name + ' HP: ' + str(attacker.hp))
+			print('Attacking ' + str(attacker) + ' HP: ' + str(attacker.hp))
 
 	attacker.exhaust()
+
+	return {
+		'attacker_HP': attacker.hp, 
+		'defender_HP': defender.hp,
+		'damage_to_attacker': attacker_HP - attacker.hp,
+		'damage_to_defender': defender_HP - defender.hp
+	}
