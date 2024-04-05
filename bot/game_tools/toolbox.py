@@ -11,6 +11,12 @@ def all_units_exhausted(units):
 				return False
 	return True
 
+def can_use_unit(units, p0):
+	for unit in units[p0]:
+		if not unit.exhausted:
+			return True
+	return False
+
 def end_of_round(units):
 	"""
 	Receives a dictionary containing both players' units

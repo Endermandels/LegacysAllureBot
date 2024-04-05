@@ -214,23 +214,26 @@ class LA_Env(AECEnv):
 			return self._was_dead_step(action)
 
 		# Assert valid move
-		if not self.valid_move(action):
-			print(self.parse_action(action))
 		assert self.valid_move(action), "played illegal move."
 
-		# Get Next Player
-		next_agent = self._agent_selector.next()
-
 		#________________Update board state________________#
+
+		# Player makes a move
+		passed = self.perform_action(self.parse_action(action))
+		if not passed:
+			self.p0_first_turn = not self.is_p0_agent()
 
 		# If all units exhausted
 		if all_units_exhausted(self.units):
 			# Go to next round
 			end_of_round(self.units)
 			self.round += 1
+			print(f'\nGoing to Round {str(self.round)}\n')
 
+			# Check if game ends
 			if self.round == 8:
 				winner, loser = self.get_winner()
+				print(f'[{winner}] Wins!\n\n\n')
 				
 				# TODO: Rework rewards
 				self.rewards[winner] += 1
@@ -246,19 +249,14 @@ class LA_Env(AECEnv):
 			# Check if current player goes first
 			if self.p0_first_turn != self.is_p0_agent():
 				# Switch Player
-				self.agent_selection = next_agent
-				return
-
-		# Player makes a move
-		passed = self.perform_action(self.parse_action(action))
-		if passed:
-			self.p0_first_turn = self.is_p0_agent()
-
-		# Switch Player
-		self.agent_selection = next_agent
+				self.agent_selection = self._agent_selector.next()
+		elif can_use_unit(self.units, not self.is_p0_agent()):
+			# Switch Player
+			self.agent_selection = self._agent_selector.next()
 
 		# Accumulate Rewards
 		self._accumulate_rewards()
+
 
 	def reset(self, seed=None, options=None):
 		#_________________RESET ENVIRONMENT_________________#
@@ -266,13 +264,13 @@ class LA_Env(AECEnv):
 		self.board = Board()
 		self.units = dict()
 
-		# P0
+		# P0 (Attacker)
 		self.units[True] = [
 			Unit(SWORDSMAN, 'D2', True, self.board.hexes),
 			Unit(SWORDSMAN, 'C3', True, self.board.hexes)
 		]
 
-		# P1
+		# P1 (Defender)
 		self.units[False] = [
 			Unit(SWORDSMAN, 'D3', False, self.board.hexes)
 		]
