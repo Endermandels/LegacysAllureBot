@@ -7,6 +7,13 @@ Each hex contains:
 
 class Board():
 	def __init__(self):
+		self.CENTER_HEX = 'E4'
+
+		self.HEX_LIST = []
+		for let in range(9):
+			for num in range(7 - let % 2):
+				self.HEX_LIST.append(chr(65+let) + str(num+1))
+
 		self.hexes = {
 			'A1': {'adj spaces': ['A2', 'B1'], 'buffs': [], 'occupying': None},
 			'A2': {'adj spaces': ['A3', 'B2', 'B1', 'A1'], 'buffs': [], 'occupying': None},
@@ -77,7 +84,7 @@ class Board():
 			'I7': {'adj spaces': ['H6', 'I6'], 'buffs': [], 'occupying': None}
 		}
 
-		self.p1_draft = {
+		self.p0_draft = {
 			'A1': {'adj spaces': ['A2', 'B1'], 'buffs': [], 'occupying': None},
 			'A2': {'adj spaces': ['A3', 'B2', 'B1', 'A1'], 'buffs': [], 'occupying': None},
 			'B1': {'adj spaces': ['A1', 'A2', 'B2', 'C2', 'C1'], 'buffs': [], 'occupying': None},
@@ -98,7 +105,7 @@ class Board():
 			'I2': {'adj spaces': ['I3', 'H2', 'H1', 'I1'], 'buffs': [], 'occupying': None}
 		}
 
-		self.p2_draft = {
+		self.p1_draft = {
 			'A6': {'adj spaces': ['A7', 'B6', 'B5', 'A5'], 'buffs': [], 'occupying': None},
 			'A7': {'adj spaces': ['B6', 'A6'], 'buffs': [], 'occupying': None},
 			'B5': {'adj spaces': ['A5', 'A6', 'B6', 'C6', 'C5', 'B4'], 'buffs': [], 'occupying': None},
@@ -118,3 +125,9 @@ class Board():
 			'I6': {'adj spaces': ['I7', 'H6', 'H5', 'I5'], 'buffs': [], 'occupying': None},
 			'I7': {'adj spaces': ['H6', 'I6'], 'buffs': [], 'occupying': None}
 		}
+
+	def get_hex(self, nhex):
+		return self.HEX_LIST[nhex]
+
+	def get_unit_at_hex_num(self, nhex):
+		return self.hexes[self.get_hex(nhex)]['occupying']

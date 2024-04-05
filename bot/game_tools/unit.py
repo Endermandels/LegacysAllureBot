@@ -1,5 +1,5 @@
 class Unit:
-	def __init__(self, data, _hex, p1, board):
+	def __init__(self, data, _hex, p0, board):
 		# Initial Card Stats
 		self.ATK = data['atk']
 		self.RNG = data['rng']
@@ -15,7 +15,7 @@ class Unit:
 		self.dead = False
 		self.hex = _hex
 
-		self.p1 = p1
+		self.p0 = p0
 		board[self.hex]['occupying'] = self
 
 		# Unused
