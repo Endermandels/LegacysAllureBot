@@ -1,20 +1,29 @@
 # Game Specific
-CENTER_HEX = 'E4'
+
 
 def all_units_exhausted(units):
-	for unit in units['p1 units']:
-		if not unit.exhausted:
-			return False
-	for unit in units['p2 units']:
-		if not unit.exhausted:
-			return False
+	"""
+	Receives a dictionary containing both players' units
+	"""
+	for player in units.keys():
+		for unit in units[player]:
+			if not unit.exhausted:
+				return False
 	return True
 
+def can_use_unit(units, p0):
+	for unit in units[p0]:
+		if not unit.exhausted:
+			return True
+	return False
+
 def end_of_round(units):
-	for unit in units['p1 units']:
-		unit.refresh()
-	for unit in units['p2 units']:
-		unit.refresh()
+	"""
+	Receives a dictionary containing both players' units
+	"""
+	for player in units.keys():
+		for unit in units[player]:
+			unit.refresh()
 
 def has_AP(unit):
 	return 'AP' in unit.passives
@@ -46,7 +55,7 @@ def dfs(board, unit, _hex, depth, all_paths, path=[]):
 			all_paths.append(path.copy())
 	elif has_FLY(unit) or has_PATH(unit):
 		path.append(_hex)
-	elif has_AP(unit) and unit.p1==occupying_unit.p1:
+	elif has_AP(unit) and unit.p0 == occupying_unit.p0:
 		path.append(_hex)
 	else:
 		return
@@ -57,6 +66,11 @@ def dfs(board, unit, _hex, depth, all_paths, path=[]):
 	path.pop()
 
 def generate_paths(board, unit):
+	"""
+	Returns a list of lists.
+	Each list contains the unit's start hex and all subsequent hexes from that start hex
+	within the unit's movement.
+	"""
 	all_paths = []
 	dfs(board, 
 		unit,
@@ -70,14 +84,33 @@ def generate_paths(board, unit):
 	
 	return all_paths
 
-def enemies_adj_hex(board, _hex, p1):
+def generate_set_destinations(board, unit):
+	"""
+	Returns a set containing all possible destinations for a unit.
+	Excludes the unit's starting hex
+	"""
+	paths = generate_paths(board, unit)
+
+	result = set()
+
+	for path in paths:
+		if path[-1] != unit.hex:
+			result.add(path[-1])
+
+	return result
+
+def enemies_adj_hex(board, _hex, p0):
 	all_enemies = []
 	for h in board[_hex]['adj spaces']:
 		occupying_unit = board[h]['occupying']
-		if occupying_unit and occupying_unit.p1 == p1:
+		if occupying_unit and occupying_unit.p0 == p0:
 			all_enemies.append(occupying_unit)
 	return all_enemies
 
-def attackable_hexes(board, unit):
+def attackable_enemies(board, unit):
+	"""
+	Returns a list containing all enemies unit can attack
+	"""
+
 	# For melee only units
-	return enemies_adj_hex(board, unit.hex, not unit.p1)
+	return enemies_adj_hex(board, unit.hex, not unit.p0)
