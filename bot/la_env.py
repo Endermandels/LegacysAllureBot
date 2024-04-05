@@ -110,7 +110,7 @@ class LA_Env(AECEnv):
 		return self.action_spaces[agent]
 
 	def is_p0_agent(self):
-		return self._agent_selector.selected_agent == 'player_0'
+		return self.agent_selection == 'player_0'
 
 	def _legal_moves(self):
 		return [i for i in range(NACTION_SPACE) if self.valid_move(i)]
@@ -182,7 +182,7 @@ class LA_Env(AECEnv):
 		Takes in a parsed action dict.
 		Returns whether the agent passed with a unit.
 		"""
-		print(f'[{self._agent_selector.selected_agent}] Turn')
+		print(f'[{self.agent_selection}] Turn')
 
 		_hex = action['hex']
 		atype = action['type']
@@ -191,12 +191,22 @@ class LA_Env(AECEnv):
 		if atype == 'move':
 			move_unit(unit, _hex, self.board.hexes)
 		elif atype == 'attack':
-			attack_unit(unit, self.board.hexes[_hex], self.board.hexes, self.units)
+			attack_unit(unit, self.board.hexes[_hex]['occupying'], self.board.hexes, self.units)
 		elif atype == 'pass':
 			pass_unit(unit)
 			return True
 
 		return False
+
+	def get_winner(self):
+		center_unit = self.board.hexes[self.board.CENTER_HEX]['occupying']
+
+		# Attacker wins by controling the center at end of game
+		if center_unit and center_unit.p0:
+			return (self.agents[0], self.agents[1])
+
+		# Defender wins otherwise
+		return (self.agents[1], self.agents[0])
 
 	def step(self, action):
 		if self.truncations[self.agent_selection] or \
@@ -204,6 +214,8 @@ class LA_Env(AECEnv):
 			return self._was_dead_step(action)
 
 		# Assert valid move
+		if not self.valid_move(action):
+			print(self.parse_action(action))
 		assert self.valid_move(action), "played illegal move."
 
 		# Get Next Player
@@ -212,17 +224,19 @@ class LA_Env(AECEnv):
 		#________________Update board state________________#
 
 		# If all units exhausted
-		if all_units_exhausted(self.board.hexes):
+		if all_units_exhausted(self.units):
 			# Go to next round
-			end_of_round(self.board.hexes)
+			end_of_round(self.units)
 			self.round += 1
 
-			# winner = self.check_for_winner()
-			winner = True # TODO: Delete
-			if winner:
+			if self.round == 8:
+				winner, loser = self.get_winner()
+				
 				# TODO: Rework rewards
-				self.rewards[self.agent_selection] += 1
-				self.rewards[next_agent] -= 1
+				self.rewards[winner] += 1
+				self.rewards[loser] -= 1
+
+				# Stop game
 				self.terminations = {i: True for i in self.agents}
 
 				# Accumulate Rewards
@@ -250,16 +264,16 @@ class LA_Env(AECEnv):
 		#_________________RESET ENVIRONMENT_________________#
 
 		self.board = Board()
-		self.units = {True: [], False: []}
+		self.units = dict()
 
 		# P0
-		self.units[self.agents[0]] = [
+		self.units[True] = [
 			Unit(SWORDSMAN, 'D2', True, self.board.hexes),
 			Unit(SWORDSMAN, 'C3', True, self.board.hexes)
 		]
 
 		# P1
-		self.units[self.agents[1]] = [
+		self.units[False] = [
 			Unit(SWORDSMAN, 'D3', False, self.board.hexes)
 		]
 

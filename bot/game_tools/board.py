@@ -7,6 +7,8 @@ Each hex contains:
 
 class Board():
 	def __init__(self):
+		self.CENTER_HEX = 'E4'
+
 		self.HEX_LIST = []
 		for let in range(9):
 			for num in range(7 - let % 2):

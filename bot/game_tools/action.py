@@ -9,7 +9,7 @@ def pass_unit(unit):
 	unit.exhaust()
 	print(	'Passed ' + unit.name + ' on ' + unit.hex)
 
-def move_unit(unit, hex, board):
+def move_unit(unit, _hex, board):
 	prev_hex = unit.hex
 
 	board[unit.hex]['occupying'] = None
@@ -17,10 +17,12 @@ def move_unit(unit, hex, board):
 	board[unit.hex]['occupying'] = unit
 	unit.exhaust()
 
-	print(	'Moved ' + unit.name + ' from ' + prev_hex + ' to ' + unit.hex)
+	print('Moved ' + unit.name + ' from ' + prev_hex + ' to ' + unit.hex)
 
 def attack_unit(attacker, defender, board, units):
 	defender.attacked_by(attacker)
+
+	print('Attacked ' + defender.name + ' with ' + attacker.name)
 
 	if defender.dead:
 		# Move into defending unit's hex
