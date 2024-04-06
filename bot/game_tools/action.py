@@ -5,9 +5,13 @@ Handles each action:
 	Pass
 """
 
+DEBUG = True
+
 def pass_unit(unit):
 	unit.exhaust()
-	print(	'Passed ' + unit.name + ' on ' + unit.hex)
+
+	if DEBUG:
+		print('Passed ' + unit.name + ' on ' + unit.hex)
 
 def move_unit(unit, _hex, board):
 	prev_hex = unit.hex
@@ -17,7 +21,8 @@ def move_unit(unit, _hex, board):
 	board[unit.hex]['occupying'] = unit
 	unit.exhaust()
 
-	print('Moved ' + unit.name + ' from ' + prev_hex + ' to ' + unit.hex)
+	if DEBUG:
+		print('Moved ' + unit.name + ' from ' + prev_hex + ' to ' + unit.hex)
 
 def attack_unit(attacker, defender, board, units):
 	"""
@@ -33,7 +38,8 @@ def attack_unit(attacker, defender, board, units):
 
 	defender.attacked_by(attacker)
 
-	print('Attacked ' + defender.name + ' with ' + attacker.name)
+	if DEBUG:
+		print('Attacked ' + defender.name + ' with ' + attacker.name)
 
 	if defender.dead:
 		# Move into defending unit's hex
@@ -41,13 +47,15 @@ def attack_unit(attacker, defender, board, units):
 		attacker.hex = defender.hex
 		board[attacker.hex]['occupying'] = attacker
 
-		print('Killed defending ' + str(defender))
-		print('Moved attacking ' + attacker.name + ' to ' + attacker.hex)
+		if DEBUG:
+			print('Killed defending ' + str(defender))
+			print('Moved attacking ' + attacker.name + ' to ' + attacker.hex)
 
 		# Remove defender unit from units
 		units[defender.p0].remove(defender)
 	else:
-		print('Defending ' + str(defender) + ' HP: ' + str(defender.hp))
+		if DEBUG:
+			print('Defending ' + str(defender) + ' HP: ' + str(defender.hp))
 
 		# Receive retaliation damage
 		attacker.retaliated_by(defender)
@@ -57,9 +65,11 @@ def attack_unit(attacker, defender, board, units):
 			board[attacker.hex]['occupying'] = None
 			units[attacker.p0].remove(attacker)
 
-			print('Attacking ' + str(attacker) + ' died in retaliation')
+			if DEBUG:
+				print('Attacking ' + str(attacker) + ' died in retaliation')
 		else:
-			print('Attacking ' + str(attacker) + ' HP: ' + str(attacker.hp))
+			if DEBUG:
+				print('Attacking ' + str(attacker) + ' HP: ' + str(attacker.hp))
 
 	attacker.exhaust()
 

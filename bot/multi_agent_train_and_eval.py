@@ -89,12 +89,11 @@ def train_action_mask(env_fn, steps=10_000, seed=0):
     model.set_random_seed(seed)
     model.learn(total_timesteps=steps)
 
-    model.save(f"{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}")
+    model.save(f"saved_models/{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}")
 
     print("Model has been saved.")
 
     print(f"Finished training on {str(env.unwrapped.metadata['name'])}.\n")
-
 
 def eval_action_mask(env_fn, num_games=100):
     # Evaluate a trained agent vs a random agent

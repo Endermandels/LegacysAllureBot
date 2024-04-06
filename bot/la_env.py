@@ -45,8 +45,8 @@ def env():
 
 class LA_Env(AECEnv):
 	metadata = {
-        "name": "legacys_allure_v1",
-        "is_parallelizable": False
+		"name": "legacys_allure_v1",
+		"is_parallelizable": False
 	}
 
 	def __init__(self):
@@ -60,7 +60,7 @@ class LA_Env(AECEnv):
 			i: spaces.Dict(
 				{
 					"observation": spaces.Box(
-						low=0, high=1, shape=(1,), dtype=np.float64
+						low=0, high=1, shape=(1,), dtype=np.int8
 					),
 					"action_mask": spaces.Box(
 						low=0, high=1, shape=(NACTION_SPACE,), dtype=np.int8
@@ -84,12 +84,14 @@ class LA_Env(AECEnv):
 	#        [2, 0, 0, 0, 1, 1, 0],
 	#        [1, 1, 2, 1, 0, 1, 0]], dtype=int8)
 	def observe(self, agent):
-		# board_vals = np.array(self.board).reshape(6, 7)
+		# board_vals = np.array(self.board_test).reshape(6, 7)
 		# cur_player = self.possible_agents.index(agent)
 		# opp_player = (cur_player + 1) % 2
 
 		# cur_p_board = np.equal(board_vals, cur_player + 1)
 		# opp_p_board = np.equal(board_vals, opp_player + 1)
+
+		# print(cur_p_board)
 
 		# observation = np.stack([cur_p_board, opp_p_board], axis=2).astype(np.int8)
 		legal_moves = self._legal_moves() if agent == self.agent_selection else []
@@ -101,6 +103,7 @@ class LA_Env(AECEnv):
 		for i in legal_moves:
 			action_mask[i] = 1
 
+		print('observing')
 		return {"observation": observation, "action_mask": action_mask}
 
 	def observation_space(self, agent):
@@ -182,7 +185,8 @@ class LA_Env(AECEnv):
 		Takes in a parsed action dict.
 		Returns a dict with the following information:
 		"""
-		print(f'[{self.agent_selection}] Turn')
+		if DEBUG:
+			print(f'[{self.agent_selection}] Turn')
 
 		_hex = action['hex']
 		atype = action['type']
@@ -246,12 +250,16 @@ class LA_Env(AECEnv):
 			# Go to next round
 			end_of_round(self.units)
 			self.round += 1
-			print(f'\nGoing to Round {str(self.round)}\n')
+	
+			if DEBUG:
+				print(f'\nGoing to Round {str(self.round)}\n')
 
 			# Check if game ends
 			if self.round == 8:
 				winner, loser = self.get_winner()
-				print(f'[{winner}] Wins!\n\n\n')
+
+				if DEBUG:
+					print(f'[{winner}] Wins!\n\n\n')
 				
 				# Rewards
 				self.rewards[winner] += 1000
