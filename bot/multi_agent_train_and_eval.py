@@ -95,9 +95,9 @@ def train_action_mask(env_fn, steps=10_000, seed=0):
 
     print(f"Finished training on {str(env.unwrapped.metadata['name'])}.\n")
 
-def eval_action_mask(env_fn, num_games=100, human_readable=False):
+def eval_action_mask(env_fn, num_games=100, human_readable=False, vs_human=False):
     # Evaluate a trained agent vs a random agent
-    env = env_fn.env(DEBUG=human_readable)
+    env = env_fn.env(DEBUG=human_readable or vs_human, vs_human=vs_human)
 
     player = 0
 
@@ -145,7 +145,18 @@ def eval_action_mask(env_fn, num_games=100, human_readable=False):
                 break
             else:
                 if agent == env.possible_agents[1 - player]:
-                    act = env.action_space(agent).sample(action_mask)
+                    if not vs_human:
+                        act = env.action_space(agent).sample(action_mask)
+                    else:
+                        unit_hex = input("Enter '<unit hex>': ")
+                        act_type = input("Enter '<action type>': ")
+                        target_hex = input("Enter '<target hex>': ")
+                        print()
+                        act = env.reverse_parse_action(unit_hex, act_type, target_hex)
+                        if not env.valid_move(act):
+                            print(env.parse_action(act) if act > -1 else -1)
+                            print(f'Error: Invalid move: unit on {unit_hex} performs {act_type} to {target_hex}')
+                            break
                 else:
                     # Note: PettingZoo expects integer actions
                     act = int(model.predict(
@@ -172,10 +183,10 @@ if __name__ == "__main__":
     env_fn = la_env
 
     # Train a model against itself
-    # train_action_mask(env_fn, steps=10_000, seed=0)
+    train_action_mask(env_fn, steps=10_000, seed=0)
 
     # Evaluate 100 games against a random agent
     eval_action_mask(env_fn, num_games=100)
 
     # Watch two games vs a random agent
-    eval_action_mask(env_fn, num_games=5, human_readable=True)
+    eval_action_mask(env_fn, num_games=1, human_readable=True, vs_human=True)

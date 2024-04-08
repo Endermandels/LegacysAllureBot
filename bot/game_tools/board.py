@@ -126,6 +126,9 @@ class Board():
 			'I7': {'adj spaces': ['H6', 'I6'], 'buffs': [], 'occupying': None}
 		}
 
+	def get_nhex(self, _hex):
+		return self.HEX_LIST.index(_hex)
+
 	def get_hex(self, nhex):
 		return self.HEX_LIST[nhex]
 

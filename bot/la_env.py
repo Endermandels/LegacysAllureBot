@@ -36,8 +36,8 @@ NACIONS_PER_UNIT = (NMOVES + NATTACKS + 1) # +1 for the PASS action
 # Total action space
 NACTION_SPACE = NUNITS * NACIONS_PER_UNIT
 
-def env(DEBUG=False):
-	env = LA_Env(DEBUG=DEBUG)
+def env(DEBUG=False, vs_human=False):
+	env = LA_Env(DEBUG=DEBUG, vs_human=vs_human)
 	env = wrappers.TerminateIllegalWrapper(env, illegal_reward=-1)
 	env = wrappers.AssertOutOfBoundsWrapper(env)
 	env = wrappers.OrderEnforcingWrapper(env)
@@ -45,14 +45,15 @@ def env(DEBUG=False):
 
 class LA_Env(AECEnv):
 	metadata = {
-		"name": "legacys_allure_v1",
+		"name": "legacys_allure_v2",
 		"is_parallelizable": False
 	}
 
-	def __init__(self, DEBUG=False):
+	def __init__(self, DEBUG=False, vs_human=False):
 		super().__init__()
 
 		self.DEBUG = DEBUG
+		self.vs_human = vs_human
 
 		self.agents = ["player_0", "player_1"]
 		self.possible_agents = self.agents[:]
@@ -130,9 +131,10 @@ class LA_Env(AECEnv):
 		Take an int
 		Return a dict explaining the action
 		"""
+
 		parsed_action = dict()
 
-		n_unit = action % NUNITS
+		n_unit = action // NACIONS_PER_UNIT
 		n_action = action % NACIONS_PER_UNIT
 
 		parsed_action['hex'] = None
@@ -155,15 +157,39 @@ class LA_Env(AECEnv):
 		else:
 			# TODO: Implement different attack paths
 			parsed_action['type'] = 'attack'
-			parsed_action['hex'] = self.board.get_hex(n_action - NMOVES - 1) # only true when n_action is 'move'
+			parsed_action['hex'] = self.board.get_hex(n_action - NMOVES - 1) # only true when n_action is 'attack'
 
 		return parsed_action
+
+	def reverse_parse_action(self, unit_hex, act_type, target_hex):
+		if not unit_hex in self.board.HEX_LIST or not target_hex in self.board.HEX_LIST:
+			return -1
+
+		n_hex = self.board.get_nhex(unit_hex)
+		n_unit = n_hex * NACIONS_PER_UNIT
+		n_target_hex = self.board.get_nhex(target_hex)
+		
+		# Pass (default)
+		n_action = 0
+
+		if act_type == 'move':
+			# Move
+			n_action = n_target_hex + 1
+		elif act_type == 'attack':
+			# Attack
+			n_action = n_target_hex + NMOVES + 1
+
+		return n_unit + n_action
 
 	def valid_move(self, action):
 		"""
 		action: int in range(NACTION_SPACE)
 		returns whether the action is legal
 		"""
+		if action < 0:
+			# For when the user is trying to perform an invalid action
+			return False
+
 		action = self.parse_action(action)
 		_hex = action['hex']
 		atype = action['type']
@@ -203,7 +229,7 @@ class LA_Env(AECEnv):
 		if atype == 'move':
 			move_unit(unit, _hex, self.board.hexes, DEBUG=self.DEBUG)
 			dist = dist_to_hex(_hex, self.board.CENTER_HEX, self.board.hexes)
-			self.rewards[self.agent_selection] += int(50 / max(dist*self.round, 1))
+			self.rewards[self.agent_selection] += 50 // max(dist*self.round, 1)
 		elif atype == 'attack':
 			results = attack_unit(	unit, 
 									self.board.hexes[_hex]['occupying'], 
@@ -292,9 +318,23 @@ class LA_Env(AECEnv):
 			# Check if current player goes first
 			if self.p0_first_turn != self.is_p0_agent() and \
 				can_use_unit(self.units, not self.is_p0_agent()):
+				if self.vs_human and self.agent_selection == 'player_0':
+					print('\nUnits:')
+					for key in self.units.keys():
+						for unit in self.units[key]:
+							print(f'[Player 0]: {unit.p0}; Name: {unit.name}; Hex: {unit.hex}')
+					print()
+				
 				# Switch Player
 				self.agent_selection = self._agent_selector.next()
 		elif can_use_unit(self.units, not self.is_p0_agent()):
+			if self.vs_human and self.agent_selection == 'player_0':
+				print('\nUnits:')
+				for key in self.units.keys():
+					for unit in self.units[key]:
+						print(f'[Player 0]: {unit.p0}; Name: {unit.name}; Hex: {unit.hex}')
+				print()
+			
 			# Switch Player
 			self.agent_selection = self._agent_selector.next()
 
@@ -310,13 +350,13 @@ class LA_Env(AECEnv):
 
 		# P0 (Attacker)
 		self.units[True] = [
-			Unit(SWORDSMAN, 'D2', True, self.board.hexes),
-			Unit(SWORDSMAN, 'C3', True, self.board.hexes)
+			Unit(SWORDSMAN, 'D5', True, self.board.hexes),
+			Unit(SWORDSMAN, 'E6', True, self.board.hexes)
 		]
 
 		# P1 (Defender)
 		self.units[False] = [
-			Unit(SWORDSMAN, 'D3', False, self.board.hexes)
+			Unit(SWORDSMAN, 'D2', False, self.board.hexes)
 		]
 
 		self.round = 1
