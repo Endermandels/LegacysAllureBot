@@ -99,8 +99,10 @@ def eval_action_mask(env_fn, num_games=100, human_readable=False):
     # Evaluate a trained agent vs a random agent
     env = env_fn.env(DEBUG=human_readable)
 
+    player = 0
+
     print(  "Starting evaluation vs a random agent. " +
-            f"Trained agent will play as {env.possible_agents[1]}.")
+            f"Trained agent will play as {env.possible_agents[player]}.")
 
     try:
         latest_policy = max(glob.glob(f"saved_models/{env.metadata['name']}*.zip"),
@@ -117,7 +119,7 @@ def eval_action_mask(env_fn, num_games=100, human_readable=False):
 
     for i in range(num_games):
         env.reset(seed=i)
-        env.action_space(env.possible_agents[0]).seed(i)
+        env.action_space(env.possible_agents[1 - player]).seed(i)
 
         for agent in env.agent_iter():
             obs, reward, termination, truncation, info = env.last()
@@ -127,8 +129,8 @@ def eval_action_mask(env_fn, num_games=100, human_readable=False):
 
             if termination or truncation:
                 # If there is a winner, keep track, otherwise don't change the scores (tie)
-                if env.rewards[env.possible_agents[0]] \
-                    != env.rewards[env.possible_agents[1]]:
+                if env.rewards[env.possible_agents[1 - player]] \
+                    != env.rewards[env.possible_agents[player]]:
                     winner = max(env.rewards, key=env.rewards.get)
 
                     # only tracks the largest reward (winner of game)
@@ -142,7 +144,7 @@ def eval_action_mask(env_fn, num_games=100, human_readable=False):
                 round_rewards.append(env.rewards)
                 break
             else:
-                if agent == env.possible_agents[0]:
+                if agent == env.possible_agents[1 - player]:
                     act = env.action_space(agent).sample(action_mask)
                 else:
                     # Note: PettingZoo expects integer actions
@@ -158,7 +160,7 @@ def eval_action_mask(env_fn, num_games=100, human_readable=False):
     if sum(scores.values()) == 0:
         winrate = 0
     else:
-        winrate = scores[env.possible_agents[1]] / sum(scores.values())
+        winrate = scores[env.possible_agents[player]] / sum(scores.values())
     print("Rewards by round: ", round_rewards)
     print("Total rewards (incl. negative rewards): ", total_rewards)
     print("Winrate: ", winrate)
@@ -170,7 +172,7 @@ if __name__ == "__main__":
     env_fn = la_env
 
     # Train a model against itself
-    train_action_mask(env_fn, steps=10_000, seed=0)
+    # train_action_mask(env_fn, steps=10_000, seed=0)
 
     # Evaluate 100 games against a random agent
     eval_action_mask(env_fn, num_games=100)

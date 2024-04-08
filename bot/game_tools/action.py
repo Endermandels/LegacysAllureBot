@@ -80,6 +80,8 @@ def attack_unit(attacker, defender, board, units=[], pretend=False, DEBUG=False)
 	return {
 		'attacker_HP': attacker.hp, 
 		'defender_HP': defender.hp,
+		'attacker_gold': attacker.gold,
+		'defender_gold': defender.gold,
 		'damage_to_attacker': attacker_HP - attacker.hp,
 		'damage_to_defender': defender_HP - defender.hp
 	}

@@ -203,7 +203,7 @@ class LA_Env(AECEnv):
 		if atype == 'move':
 			move_unit(unit, _hex, self.board.hexes, DEBUG=self.DEBUG)
 			dist = dist_to_hex(_hex, self.board.CENTER_HEX, self.board.hexes)
-			self.rewards[self.agent_selection] = 30 - dist**self.round
+			self.rewards[self.agent_selection] += int(50 / max(dist*self.round, 1))
 		elif atype == 'attack':
 			results = attack_unit(	unit, 
 									self.board.hexes[_hex]['occupying'], 
@@ -212,21 +212,27 @@ class LA_Env(AECEnv):
 									DEBUG=self.DEBUG)
 			attacker_HP = results['attacker_HP']
 			defender_HP = results['defender_HP']
+			attacker_gold = results['attacker_gold']
+			defender_gold = results['defender_gold']
 			damage_to_attacker = results['damage_to_attacker']
 			damage_to_defender = results['damage_to_defender']
 			
 			# Reward killing enemy, punish killing ally
-			if attacker_HP <= 0:
-				self.rewards[self.agent_selection] -= 30 - (damage_to_defender**2)
-			elif defender_HP <= 0:
-				self.rewards[self.agent_selection] += 100 - (damage_to_attacker**2)
+			if defender_HP <= 0:
+				self.rewards[self.agent_selection] += 30*defender_gold - \
+					(damage_to_attacker**2)
+			elif attacker_HP <= 0:
+				self.rewards[self.agent_selection] -= 30*attacker_gold - \
+					(damage_to_defender**2)
 			else:
-				self.rewards[self.agent_selection] += 20 + (damage_to_defender*2) - (damage_to_attacker**2)
+				self.rewards[self.agent_selection] += 50 + \
+					(damage_to_defender*defender_gold) - \
+					(damage_to_attacker*attacker_gold)
 		elif atype == 'pass':
 			pass_unit(unit, DEBUG=self.DEBUG)
 			# Usually, first turn is a good thing to have
 			if self.p0_first_turn == self.is_p0_agent():
-				self.rewards[self.agent_selection] += 10
+				self.rewards[self.agent_selection] += 5
 			return True
 
 		return False
