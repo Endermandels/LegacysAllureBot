@@ -142,3 +142,70 @@ def attackable_enemies(board, unit):
 
 	# For melee only units
 	return enemies_adj_hex(board, unit.hex, not unit.p0)
+
+def num_possible_kills(board, units, p0, attack_unit):
+	"""
+	NOTE: attack_unit is the function from action.py
+
+	Returns the number of killable enemies next turn and next round.
+	Each enemy kill is worth the unit's gold squared.
+	Every enemy kill is summed together.
+	"""
+	next_turn = 0
+	next_round = 0
+
+	for unit in units[p0]:
+		enemies = attackable_enemies(board, unit)
+		for enemy in enemies:
+			kill_enemy = attack_unit(unit, enemy, board, pretend=True)
+			if kill_enemy:
+				next_round += enemy.gold * 3
+				if not unit.exhausted:
+					next_turn += enemy.gold ** 2
+
+	return next_turn, next_round
+
+def gold_remaining(units, p0):
+	"""
+	Returns the remaining gold for p0 units and p1 units.
+	"""
+	allies = 0
+	enemies = 0
+
+	for unit in units[p0]:
+		allies += unit.gold
+
+	for unit in units[not p0]:
+		enemies += unit.gold
+
+	return allies, enemies
+
+def observable_units(board_class, p0):
+	"""
+	Returns a list of encoded units on each hex.
+	units in each hex:
+		0 for none
+		1 for ally
+		2 for exhausted ally
+		3 for enemy
+		4 for exhausted enemy
+	"""
+	results = []
+	for _hex in board_class.HEX_LIST:
+		unit = board_class.hexes[_hex]['occupying']
+		if not unit:
+			# No unit
+			results.append(0)
+		elif unit.p0 == p0:
+			# Ally
+			if not unit.exhausted:
+				results.append(1)
+			else:
+				results.append(2)
+		else:
+			# Enemy
+			if not unit.exhausted:
+				results.append(3)
+			else:
+				results.append(4)
+	return results

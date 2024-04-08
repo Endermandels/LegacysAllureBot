@@ -36,8 +36,8 @@ NACIONS_PER_UNIT = (NMOVES + NATTACKS + 1) # +1 for the PASS action
 # Total action space
 NACTION_SPACE = NUNITS * NACIONS_PER_UNIT
 
-def env():
-	env = LA_Env()
+def env(DEBUG=False):
+	env = LA_Env(DEBUG=DEBUG)
 	env = wrappers.TerminateIllegalWrapper(env, illegal_reward=-1)
 	env = wrappers.AssertOutOfBoundsWrapper(env)
 	env = wrappers.OrderEnforcingWrapper(env)
@@ -49,8 +49,10 @@ class LA_Env(AECEnv):
 		"is_parallelizable": False
 	}
 
-	def __init__(self):
+	def __init__(self, DEBUG=False):
 		super().__init__()
+
+		self.DEBUG = DEBUG
 
 		self.agents = ["player_0", "player_1"]
 		self.possible_agents = self.agents[:]
@@ -60,7 +62,7 @@ class LA_Env(AECEnv):
 			i: spaces.Dict(
 				{
 					"observation": spaces.Box(
-						low=0, high=1, shape=(1,), dtype=np.int8
+						low=0, high=80, shape=(6+NHEXES,), dtype=np.int8
 					),
 					"action_mask": spaces.Box(
 						low=0, high=1, shape=(NACTION_SPACE,), dtype=np.int8
@@ -70,40 +72,45 @@ class LA_Env(AECEnv):
 			for i in self.agents
 		}
 
-	# Key
-	# ----
-	# blank space = 0
-	# agent 0 = 1
-	# agent 1 = 2
-	# An observation is list of lists, where each list represents a row
-	#
-	# array([[0, 1, 1, 2, 0, 1, 0],
-	#        [1, 0, 1, 2, 2, 2, 1],
-	#        [0, 1, 0, 0, 1, 2, 1],
-	#        [1, 0, 2, 0, 1, 1, 0],
-	#        [2, 0, 0, 0, 1, 1, 0],
-	#        [1, 1, 2, 1, 0, 1, 0]], dtype=int8)
+	"""
+	Observations:
+		is attacker
+		current round
+		allied gold remaining
+		enemy gold remaining
+		num kills possible next turn
+		num kills possible next round
+		units in each hex:
+			0 for none
+			1 for ally
+			2 for exhausted ally
+			3 for enemy
+			4 for exhausted enemy
+	"""
 	def observe(self, agent):
-		# board_vals = np.array(self.board_test).reshape(6, 7)
-		# cur_player = self.possible_agents.index(agent)
-		# opp_player = (cur_player + 1) % 2
-
-		# cur_p_board = np.equal(board_vals, cur_player + 1)
-		# opp_p_board = np.equal(board_vals, opp_player + 1)
-
-		# print(cur_p_board)
-
-		# observation = np.stack([cur_p_board, opp_p_board], axis=2).astype(np.int8)
 		legal_moves = self._legal_moves() if agent == self.agent_selection else []
-
-		observation = [0]
-		observation = np.array(observation)
 
 		action_mask = np.zeros(NACTION_SPACE, "int8")
 		for i in legal_moves:
 			action_mask[i] = 1
 
-		print('observing')
+		#_______________OBSERVATIONS_______________#
+
+		allied_gold, enemy_gold = gold_remaining(self.units, self.is_p0_agent())
+		kills_next_turn, kills_next_round = num_possible_kills(
+			self.board.hexes, self.units, self.is_p0_agent(), attack_unit)
+
+		observation = [
+			int(self.is_p0_agent()),
+			self.round, 
+			allied_gold, 
+			enemy_gold, 
+			kills_next_turn, 
+			kills_next_round
+		]
+		observation += observable_units(self.board, self.is_p0_agent())
+		observation = np.array(observation)
+
 		return {"observation": observation, "action_mask": action_mask}
 
 	def observation_space(self, agent):
@@ -185,7 +192,7 @@ class LA_Env(AECEnv):
 		Takes in a parsed action dict.
 		Returns a dict with the following information:
 		"""
-		if DEBUG:
+		if self.DEBUG:
 			print(f'[{self.agent_selection}] Turn')
 
 		_hex = action['hex']
@@ -194,11 +201,15 @@ class LA_Env(AECEnv):
 
 		# Calculate reward per outcome of each action
 		if atype == 'move':
-			move_unit(unit, _hex, self.board.hexes)
+			move_unit(unit, _hex, self.board.hexes, DEBUG=self.DEBUG)
 			dist = dist_to_hex(_hex, self.board.CENTER_HEX, self.board.hexes)
 			self.rewards[self.agent_selection] = 30 - dist**self.round
 		elif atype == 'attack':
-			results = attack_unit(unit, self.board.hexes[_hex]['occupying'], self.board.hexes, self.units)
+			results = attack_unit(	unit, 
+									self.board.hexes[_hex]['occupying'], 
+									self.board.hexes, 
+									units=self.units,
+									DEBUG=self.DEBUG)
 			attacker_HP = results['attacker_HP']
 			defender_HP = results['defender_HP']
 			damage_to_attacker = results['damage_to_attacker']
@@ -212,7 +223,7 @@ class LA_Env(AECEnv):
 			else:
 				self.rewards[self.agent_selection] += 20 + (damage_to_defender*2) - (damage_to_attacker**2)
 		elif atype == 'pass':
-			pass_unit(unit)
+			pass_unit(unit, DEBUG=self.DEBUG)
 			# Usually, first turn is a good thing to have
 			if self.p0_first_turn == self.is_p0_agent():
 				self.rewards[self.agent_selection] += 10
@@ -251,14 +262,14 @@ class LA_Env(AECEnv):
 			end_of_round(self.units)
 			self.round += 1
 	
-			if DEBUG:
+			if self.DEBUG:
 				print(f'\nGoing to Round {str(self.round)}\n')
 
 			# Check if game ends
 			if self.round == 8:
 				winner, loser = self.get_winner()
 
-				if DEBUG:
+				if self.DEBUG:
 					print(f'[{winner}] Wins!\n\n\n')
 				
 				# Rewards
@@ -305,7 +316,7 @@ class LA_Env(AECEnv):
 		self.round = 1
 		self.p0_first_turn = True # Who goes first at the start of next round
 
-		#_________________RESET PLAYERS_________________#
+		#___________________RESET PLAYERS___________________#
 
 		self.agents = self.possible_agents[:]
 		self.rewards = {i: 0 for i in self.agents}
