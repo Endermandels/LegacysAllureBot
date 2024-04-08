@@ -29,13 +29,24 @@ class Unit:
 	def __repr__(self):
 		return self.name + ' on ' + self.hex
 
-	def attacked_by(self, unit):
-		self.hp -= unit.atk
-		if self.hp <= 0 :
-			self.dead = True
+	def attacked_by(self, unit, pretend=False):
+		"""
+		Returns whether this unit died.
+		"""
+		if not pretend:
+			self.hp -= unit.atk
 
-	def retaliated_by(self, unit):
-		self.attacked_by(unit)
+			if self.hp <= 0:
+				self.hp = 0 # For reward calculations
+				self.dead = True
+			return self.dead
+		return self.hp - unit.atk <= 0
+
+	def retaliated_by(self, unit, pretend=False):
+		"""
+		Returns whether this unit died.
+		"""
+		return self.attacked_by(unit, pretend)
 
 	def exhaust(self):
 		self.exhausted = True

@@ -89,22 +89,21 @@ def train_action_mask(env_fn, steps=10_000, seed=0):
     model.set_random_seed(seed)
     model.learn(total_timesteps=steps)
 
-    model.save(f"{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}")
+    model.save(f"saved_models/{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}")
 
     print("Model has been saved.")
 
     print(f"Finished training on {str(env.unwrapped.metadata['name'])}.\n")
 
-
-def eval_action_mask(env_fn, num_games=100):
+def eval_action_mask(env_fn, num_games=100, human_readable=False):
     # Evaluate a trained agent vs a random agent
-    env = env_fn.env()
+    env = env_fn.env(DEBUG=human_readable)
 
     print(  "Starting evaluation vs a random agent. " +
             f"Trained agent will play as {env.possible_agents[1]}.")
 
     try:
-        latest_policy = max(glob.glob(f"{env.metadata['name']}*.zip"),
+        latest_policy = max(glob.glob(f"saved_models/{env.metadata['name']}*.zip"),
                             key=os.path.getctime)
     except ValueError:
         print("Policy not found.")
@@ -174,8 +173,7 @@ if __name__ == "__main__":
     train_action_mask(env_fn, steps=10_000, seed=0)
 
     # Evaluate 100 games against a random agent
-    eval_action_mask(env_fn, num_games=5)
+    eval_action_mask(env_fn, num_games=100)
 
     # Watch two games vs a random agent
-    # TODO: Implement human observable games
-    # eval_action_mask(env_fn, num_games=2)
+    eval_action_mask(env_fn, num_games=5, human_readable=True)
