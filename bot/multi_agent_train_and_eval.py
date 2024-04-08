@@ -170,10 +170,10 @@ if __name__ == "__main__":
     env_fn = la_env
 
     # Train a model against itself
-    train_action_mask(env_fn, steps=100_000, seed=0)
+    train_action_mask(env_fn, steps=10_000, seed=0)
 
     # Evaluate 100 games against a random agent
     eval_action_mask(env_fn, num_games=100)
 
     # Watch two games vs a random agent
-    eval_action_mask(env_fn, num_games=2, human_readable=True)
+    eval_action_mask(env_fn, num_games=5, human_readable=True)

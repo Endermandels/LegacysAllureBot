@@ -269,9 +269,9 @@ class LA_Env(AECEnv):
 			if self.round == 8:
 				winner, loser = self.get_winner()
 
-				if self.DEBUG:
+				if self.DEBUG or winner == 'player_0':
 					print(f'[{winner}] Wins!\n\n\n')
-				
+
 				# Rewards
 				self.rewards[winner] += 1000
 				self.rewards[loser] -= 300
@@ -357,7 +357,4 @@ def test_legal_moves():
 		for action in sorted_unit_list:
 			print(action)
 		print()
-
-def test_game():
-	pass
 
