@@ -19,6 +19,12 @@ def move_unit(unit, _hex, board, DEBUG=False):
 	board[unit.hex]['occupying'] = unit
 	unit.exhaust()
 
+	if 'shield 1' in board[unit.hex]['buffs']:
+		unit.gain_shield(1, from_center=True)
+		board[unit.hex]['buffs'].remove('shield 1')
+		if DEBUG:
+			print('Unit gained a shield from the center: ' + str(board[unit.hex]['buffs']))
+
 	if DEBUG:
 		print('Moved ' + unit.name + ' from ' + prev_hex + ' to ' + unit.hex)
 
