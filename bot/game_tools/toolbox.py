@@ -189,6 +189,7 @@ def observable_units(board_class, p0):
 		2 for exhausted ally
 		3 for enemy
 		4 for exhausted enemy
+	TODO: Tell which unit a unit is (like Swordsman or Crossbowman)
 	"""
 	results = []
 	for _hex in board_class.HEX_LIST:
