@@ -101,10 +101,17 @@ class LA_Env(AECEnv):
 		kills_next_turn, kills_next_round = num_possible_kills(
 			self.board.hexes, self.units, self.is_p0_agent(), attack_unit)
 
+		if kills_next_turn > 0:
+			self.rewards[self.agent_selection] += kills_next_turn
+		if kills_next_round > 0:
+			self.rewards[self.agent_selection] += kills_next_round
+
 		occupying_center = 0
 		center_hex_unit = self.board.hexes[self.board.CENTER_HEX]['occupying']
 		if center_hex_unit:
 			occupying_center = int(center_hex_unit.p0 == self.is_p0_agent()) + 1
+
+		# TODO: Add killable_allies to observation
 
 		observation = [
 			int(self.is_p0_agent()),
@@ -117,6 +124,8 @@ class LA_Env(AECEnv):
 		]
 		observation += observable_units(self.board, self.is_p0_agent())
 		observation = np.array(observation)
+
+		# self.rewards[self.agent_selection] += allied_gold - enemy_gold
 
 		return {"observation": observation, "action_mask": action_mask}
 
@@ -234,16 +243,21 @@ class LA_Env(AECEnv):
 		atype = action['type']
 		unit = action['unit']
 
+
+		passed = False
+
 		# Promote being near the center towards the last round
 		if _hex == self.board.CENTER_HEX:
-			self.rewards[self.agent_selection] += 1.6**self.round
+			self.rewards[self.agent_selection] += 5*self.round
 
 		# Calculate reward per outcome of each action
 		if atype == 'move':
 			move_unit(unit, _hex, self.board.hexes, DEBUG=self.DEBUG)
 			dist = dist_to_hex(_hex, self.board.CENTER_HEX, self.board.hexes)
 
-			self.rewards[self.agent_selection] += 1.6**self.round // max(dist, 1)
+			# When Round 5 approaches, make sure you have enough guys in position to take center
+			if self.round > 4:
+				self.rewards[self.agent_selection] += (6/max(dist, 1) - dist) * 5
 		elif atype == 'attack':
 			results = attack_unit(	unit, 
 									self.board.hexes[_hex]['occupying'], 
@@ -260,10 +274,10 @@ class LA_Env(AECEnv):
 			# Reward killing enemy, punish killing ally
 			if defender_HP <= 0:
 				self.rewards[self.agent_selection] += 100*defender_gold - \
-					(damage_to_attacker**2)
+					(damage_to_attacker*2)
 			elif attacker_HP <= 0:
-				self.rewards[self.agent_selection] -= 30*attacker_gold - \
-					(damage_to_defender**2)
+				self.rewards[self.agent_selection] -= 40*attacker_gold - \
+					(damage_to_defender*2)
 			else:
 				self.rewards[self.agent_selection] += 30*defender_gold + \
 					(damage_to_defender*defender_gold) - \
@@ -271,12 +285,15 @@ class LA_Env(AECEnv):
 		elif atype == 'pass':
 			pass_unit(unit, DEBUG=self.DEBUG)
 
-			# Usually, first turn is a good thing to have
-			if self.p0_first_turn == self.is_p0_agent():
-				self.rewards[self.agent_selection] += 5
-			return True
+			if unit.hex == self.board.CENTER_HEX:
+				self.rewards[self.agent_selection] += 5*self.round
 
-		return False
+			# Usually, first turn is a good thing to have
+			# if self.p0_first_turn == self.is_p0_agent():
+				# self.rewards[self.agent_selection] += 2
+			passed = True
+
+		return passed
 
 	def get_winner(self):
 		center_unit = self.board.hexes[self.board.CENTER_HEX]['occupying']
@@ -316,12 +333,12 @@ class LA_Env(AECEnv):
 			if self.round == 8:
 				winner, loser = self.get_winner()
 
-				if self.DEBUG or winner == 'player_0':
+				if self.DEBUG or winner == 'player_0' or winner == 'player_1':
 					print(f'[{winner}] Wins!\n')
 
 				# Rewards
-				self.rewards[winner] += 1500
-				self.rewards[loser] -= 1000
+				self.rewards[winner] += 500
+				self.rewards[loser] -= 500
 
 				# Stop game
 				self.terminations = {i: True for i in self.agents}
