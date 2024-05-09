@@ -189,4 +189,4 @@ if __name__ == "__main__":
     eval_action_mask(env_fn, num_games=100)
 
     # Watch two games vs a random agent
-    eval_action_mask(env_fn, num_games=5, vs_human=True)
+    # eval_action_mask(env_fn, num_games=5, vs_human=True)

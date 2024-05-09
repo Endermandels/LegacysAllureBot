@@ -63,7 +63,7 @@ class LA_Env(AECEnv):
 			i: spaces.Dict(
 				{
 					"observation": spaces.Box(
-						low=0, high=80, shape=(7+NHEXES,), dtype=np.int8
+						low=0, high=1000000, shape=(5+NHEXES,), dtype=np.int8
 					),
 					"action_mask": spaces.Box(
 						low=0, high=1, shape=(NACTION_SPACE,), dtype=np.int8
@@ -76,17 +76,16 @@ class LA_Env(AECEnv):
 	"""
 	Observations:
 		is attacker
+		is going first next round
 		current round
 		allied gold remaining
 		enemy gold remaining
-		num kills possible next turn
-		num kills possible next round
 		units in each hex:
 			0 for none
-			1 for ally
-			2 for exhausted ally
-			3 for enemy
-			4 for exhausted enemy
+			1xx for ally with xx effective health
+			2xx for exhausted ally
+			3xx for enemy
+			4xx for exhausted enemy
 	"""
 	def observe(self, agent):
 		legal_moves = self._legal_moves() if agent == self.agent_selection else []
@@ -97,35 +96,32 @@ class LA_Env(AECEnv):
 
 		#_______________OBSERVATIONS_______________#
 
-		allied_gold, enemy_gold = gold_remaining(self.units, self.is_p0_agent())
-		kills_next_turn, kills_next_round = num_possible_kills(
-			self.board.hexes, self.units, self.is_p0_agent(), attack_unit)
+		allied_gold_remaining, enemy_gold_remaining = \
+			gold_remaining(self.units, self.is_p0_agent())
+		# kills_next_turn, kills_next_round = num_possible_kills(
+		# 	self.board.hexes, self.units, self.is_p0_agent(), attack_unit)
 
-		if kills_next_turn > 0:
-			self.rewards[self.agent_selection] += kills_next_turn
-		if kills_next_round > 0:
-			self.rewards[self.agent_selection] += kills_next_round
+		# if kills_next_turn > 0:
+		# 	self.rewards[self.agent_selection] += kills_next_turn
+		# if kills_next_round > 0:
+		# 	self.rewards[self.agent_selection] += kills_next_round
 
-		occupying_center = 0
-		center_hex_unit = self.board.hexes[self.board.CENTER_HEX]['occupying']
-		if center_hex_unit:
-			occupying_center = int(center_hex_unit.p0 == self.is_p0_agent()) + 1
+		# currently_winning = False
+		# center_hex_unit = self.board.hexes[self.board.CENTER_HEX]['occupying']
+		# if center_hex_unit:
+		# 	currently_winning = center_hex_unit.p0
 
-		# TODO: Add killable_allies to observation
+		# TODO: add buffs on hexes to observation (shield 1 in center)
 
 		observation = [
 			int(self.is_p0_agent()),
+			int(self.p0_first_turn == self.is_p0_agent()),
 			self.round, 
-			allied_gold, 
-			enemy_gold, 
-			occupying_center,
-			kills_next_turn, 
-			kills_next_round
+			allied_gold_remaining, 
+			enemy_gold_remaining
 		]
 		observation += observable_units(self.board, self.is_p0_agent())
 		observation = np.array(observation)
-
-		# self.rewards[self.agent_selection] += allied_gold - enemy_gold
 
 		return {"observation": observation, "action_mask": action_mask}
 
@@ -165,6 +161,7 @@ class LA_Env(AECEnv):
 
 		if n_action == 0:
 			parsed_action['type'] = 'pass'
+			parsed_action['hex'] = unit.hex
 		elif n_action < NMOVES:
 			# TODO: Implement different movement paths
 			parsed_action['type'] = 'move'
@@ -243,21 +240,18 @@ class LA_Env(AECEnv):
 		atype = action['type']
 		unit = action['unit']
 
-
 		passed = False
 
-		# Promote being near the center towards the last round
-		if _hex == self.board.CENTER_HEX:
-			self.rewards[self.agent_selection] += 5*self.round
+		if self.round == 7 and _hex == self.board.CENTER_HEX:
+			self.rewards[self.agent_selection] += 1000000
 
 		# Calculate reward per outcome of each action
 		if atype == 'move':
 			move_unit(unit, _hex, self.board.hexes, DEBUG=self.DEBUG)
 			dist = dist_to_hex(_hex, self.board.CENTER_HEX, self.board.hexes)
 
-			# When Round 5 approaches, make sure you have enough guys in position to take center
-			if self.round > 4:
-				self.rewards[self.agent_selection] += (6/max(dist, 1) - dist) * 5
+			if dist < 8-self.round:
+				self.rewards[self.agent_selection] += 1
 		elif atype == 'attack':
 			results = attack_unit(	unit, 
 									self.board.hexes[_hex]['occupying'], 
@@ -273,24 +267,15 @@ class LA_Env(AECEnv):
 			
 			# Reward killing enemy, punish killing ally
 			if defender_HP <= 0:
-				self.rewards[self.agent_selection] += 100*defender_gold - \
-					(damage_to_attacker*2)
+				self.rewards[self.agent_selection] += 3*defender_gold - damage_to_attacker
 			elif attacker_HP <= 0:
-				self.rewards[self.agent_selection] -= 40*attacker_gold - \
-					(damage_to_defender*2)
+				self.rewards[self.agent_selection] += damage_to_defender*defender_gold - \
+				damage_to_attacker*attacker_gold - 2
 			else:
-				self.rewards[self.agent_selection] += 30*defender_gold + \
-					(damage_to_defender*defender_gold) - \
-					(damage_to_attacker*attacker_gold)
+				self.rewards[self.agent_selection] += damage_to_defender*defender_gold - \
+					damage_to_attacker*attacker_gold + 2
 		elif atype == 'pass':
 			pass_unit(unit, DEBUG=self.DEBUG)
-
-			if unit.hex == self.board.CENTER_HEX:
-				self.rewards[self.agent_selection] += 5*self.round
-
-			# Usually, first turn is a good thing to have
-			# if self.p0_first_turn == self.is_p0_agent():
-				# self.rewards[self.agent_selection] += 2
 			passed = True
 
 		return passed
@@ -333,12 +318,15 @@ class LA_Env(AECEnv):
 			if self.round == 8:
 				winner, loser = self.get_winner()
 
-				if self.DEBUG or winner == 'player_0' or winner == 'player_1':
-					print(f'[{winner}] Wins!\n')
-
 				# Rewards
-				self.rewards[winner] += 500
-				self.rewards[loser] -= 500
+				self.rewards[winner] += 100
+				self.rewards[loser] -= 100
+
+				if self.DEBUG or True:
+					print(f'[{winner}] Wins!')
+					print(f'Winner Reward: {self.rewards[winner]}')
+					print(f'Loser Reward: {self.rewards[loser]}')
+					print()
 
 				# Stop game
 				self.terminations = {i: True for i in self.agents}
@@ -367,13 +355,13 @@ class LA_Env(AECEnv):
 		self.board = Board()
 		self.units = dict()
 
-		# P0 (Attacker)
+		# P0 (Attacker) (TRUE)
 		self.units[True] = [
 			Unit(SWORDSMAN, 'D5', True, self.board.hexes),
 			Unit(SWORDSMAN, 'E6', True, self.board.hexes)
 		]
 
-		# P1 (Defender)
+		# P1 (Defender) (FALSE)
 		self.units[False] = [
 			Unit(SWORDSMAN, 'D2', False, self.board.hexes)
 		]

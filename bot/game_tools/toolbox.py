@@ -185,10 +185,10 @@ def observable_units(board_class, p0):
 	Returns a list of encoded units on each hex.
 	units in each hex:
 		0 for none
-		1 for ally
-		2 for exhausted ally
-		3 for enemy
-		4 for exhausted enemy
+		1xx for ally with xx effective health
+		2xx for exhausted ally
+		3xx for enemy
+		4xx for exhausted enemy
 	TODO: Tell which unit a unit is (like Swordsman or Crossbowman)
 	"""
 	results = []
@@ -200,13 +200,13 @@ def observable_units(board_class, p0):
 		elif unit.p0 == p0:
 			# Ally
 			if not unit.exhausted:
-				results.append(1)
+				results.append(100 + unit.hp)
 			else:
-				results.append(2)
+				results.append(200 + unit.hp)
 		else:
 			# Enemy
 			if not unit.exhausted:
-				results.append(3)
+				results.append(300 + unit.hp)
 			else:
-				results.append(4)
+				results.append(400 + unit.hp)
 	return results
