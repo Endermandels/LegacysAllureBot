@@ -9,6 +9,7 @@ Original code created by the Farama Foundation:
 import gymnasium
 from gymnasium import spaces
 import numpy as np
+import time
 
 # Petting Zoo libs
 from pettingzoo import AECEnv
@@ -240,18 +241,19 @@ class LA_Env(AECEnv):
 		atype = action['type']
 		unit = action['unit']
 
+
 		passed = False
 
-		if self.round == 7 and _hex == self.board.CENTER_HEX:
-			self.rewards[self.agent_selection] += 1000000
+		if self.round > 5 and _hex == self.board.CENTER_HEX:
+			rew_amount = 5 * (self.round - 5)
+			self.rewards[self.agent_selection] += rew_amount
+			if self.DEBUG:
+				print(f'Center Reward: {rew_amount}')
 
 		# Calculate reward per outcome of each action
 		if atype == 'move':
 			move_unit(unit, _hex, self.board.hexes, DEBUG=self.DEBUG)
-			dist = dist_to_hex(_hex, self.board.CENTER_HEX, self.board.hexes)
-
-			if dist < 8-self.round:
-				self.rewards[self.agent_selection] += 1
+			# dist = dist_to_hex(_hex, self.board.CENTER_HEX, self.board.hexes)
 		elif atype == 'attack':
 			results = attack_unit(	unit, 
 									self.board.hexes[_hex]['occupying'], 
@@ -266,17 +268,26 @@ class LA_Env(AECEnv):
 			damage_to_defender = results['damage_to_defender']
 			
 			# Reward killing enemy, punish killing ally
+			rew_amount = 0
 			if defender_HP <= 0:
-				self.rewards[self.agent_selection] += 3*defender_gold - damage_to_attacker
+				rew_amount = 5*defender_gold
 			elif attacker_HP <= 0:
-				self.rewards[self.agent_selection] += damage_to_defender*defender_gold - \
-				damage_to_attacker*attacker_gold - 2
+				rew_amount = damage_to_defender*defender_gold - \
+				damage_to_attacker*attacker_gold + 2
 			else:
-				self.rewards[self.agent_selection] += damage_to_defender*defender_gold - \
-					damage_to_attacker*attacker_gold + 2
+				rew_amount = damage_to_defender*defender_gold - \
+					damage_to_attacker*attacker_gold + 10
+
+			self.rewards[self.agent_selection] += rew_amount
+			if self.DEBUG and rew_amount != 0:
+				print(f'Attack Reward: {rew_amount}')
+
 		elif atype == 'pass':
 			pass_unit(unit, DEBUG=self.DEBUG)
 			passed = True
+
+		if self.DEBUG:
+			time.sleep(0.5)
 
 		return passed
 
@@ -305,6 +316,14 @@ class LA_Env(AECEnv):
 		if not passed:
 			self.p0_first_turn = not self.is_p0_agent()
 
+		# Rewards killing enemies
+		allied_gold_remaining, enemy_gold_remaining = \
+			gold_remaining(self.units, self.is_p0_agent())
+		rew_amount = self.starting_gold[not self.is_p0_agent()] - enemy_gold_remaining
+		self.rewards[self.agent_selection] += rew_amount
+		if self.DEBUG and rew_amount != 0:
+			print(f'Gold Reward: {rew_amount}')
+
 		# If all units exhausted
 		if all_units_exhausted(self.units):
 			# Go to next round
@@ -319,10 +338,16 @@ class LA_Env(AECEnv):
 				winner, loser = self.get_winner()
 
 				# Rewards
-				self.rewards[winner] += 100
+
+				# Only reward winning by both players acting as attacker
+				center_unit = self.board.hexes[self.board.CENTER_HEX]['occupying']
+				if center_unit and center_unit.p0 == (winner == 'player_0'):
+					self.rewards[winner] += 100
+				else:
+					self.rewards[winner] -= 100
 				self.rewards[loser] -= 100
 
-				if self.DEBUG or True:
+				if self.DEBUG:
 					print(f'[{winner}] Wins!')
 					print(f'Winner Reward: {self.rewards[winner]}')
 					print(f'Loser Reward: {self.rewards[loser]}')
@@ -365,6 +390,11 @@ class LA_Env(AECEnv):
 		self.units[False] = [
 			Unit(SWORDSMAN, 'D2', False, self.board.hexes)
 		]
+
+		# Store the starting gold of each kingdom
+		p0_starting_gold, p1_starting_gold = \
+			gold_remaining(self.units, True)
+		self.starting_gold = { True: p0_starting_gold, False: p1_starting_gold }
 
 		self.round = 1
 		self.p0_first_turn = True # Who goes first at the start of next round
