@@ -69,9 +69,9 @@ def mask_fn(env):
     # helpful method we can rely on.
     return env.action_mask()
 
-def train_action_mask(env_fn, steps=10_000, seed=0):
+def train_action_mask(env_fn, steps=10_000, seed=0, human_readable=False):
     """Train a single model to play as each agent in a zero-sum game environment using invalid action masking."""
-    env = env_fn.env()
+    env = env_fn.env(DEBUG=human_readable)
 
     print(f"Starting training on {str(env.metadata['name'])}.")
 
@@ -183,10 +183,11 @@ if __name__ == "__main__":
     env_fn = la_env
 
     # Train a model against itself
-    train_action_mask(env_fn, steps=50_000, seed=0)
+    # Magic Number: 200_000 to 300_000
+    # train_action_mask(env_fn, steps=1_000_000, seed=0)
 
     # Evaluate 100 games against a random agent
-    eval_action_mask(env_fn, num_games=100)
+    # eval_action_mask(env_fn, num_games=100)
 
     # Watch two games vs a random agent
-    # eval_action_mask(env_fn, num_games=5, vs_human=True)
+    eval_action_mask(env_fn, num_games=5, vs_human=True)
