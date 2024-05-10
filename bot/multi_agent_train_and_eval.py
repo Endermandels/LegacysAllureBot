@@ -95,12 +95,14 @@ def train_action_mask(env_fn, steps=10_000, seed=0):
 
     print(f"Finished training on {str(env.unwrapped.metadata['name'])}.\n")
 
-def eval_action_mask(env_fn, num_games=100, human_readable=False):
+def eval_action_mask(env_fn, num_games=100, human_readable=False, vs_human=False):
     # Evaluate a trained agent vs a random agent
-    env = env_fn.env(DEBUG=human_readable)
+    env = env_fn.env(DEBUG=human_readable or vs_human, vs_human=vs_human)
+
+    player = 0
 
     print(  "Starting evaluation vs a random agent. " +
-            f"Trained agent will play as {env.possible_agents[1]}.")
+            f"Trained agent will play as {env.possible_agents[player]}.")
 
     try:
         latest_policy = max(glob.glob(f"saved_models/{env.metadata['name']}*.zip"),
@@ -117,7 +119,7 @@ def eval_action_mask(env_fn, num_games=100, human_readable=False):
 
     for i in range(num_games):
         env.reset(seed=i)
-        env.action_space(env.possible_agents[0]).seed(i)
+        env.action_space(env.possible_agents[1 - player]).seed(i)
 
         for agent in env.agent_iter():
             obs, reward, termination, truncation, info = env.last()
@@ -127,8 +129,8 @@ def eval_action_mask(env_fn, num_games=100, human_readable=False):
 
             if termination or truncation:
                 # If there is a winner, keep track, otherwise don't change the scores (tie)
-                if env.rewards[env.possible_agents[0]] \
-                    != env.rewards[env.possible_agents[1]]:
+                if env.rewards[env.possible_agents[1 - player]] \
+                    != env.rewards[env.possible_agents[player]]:
                     winner = max(env.rewards, key=env.rewards.get)
 
                     # only tracks the largest reward (winner of game)
@@ -142,8 +144,19 @@ def eval_action_mask(env_fn, num_games=100, human_readable=False):
                 round_rewards.append(env.rewards)
                 break
             else:
-                if agent == env.possible_agents[0]:
-                    act = env.action_space(agent).sample(action_mask)
+                if agent == env.possible_agents[1 - player]:
+                    if not vs_human:
+                        act = env.action_space(agent).sample(action_mask)
+                    else:
+                        unit_hex = input("Enter '<unit hex>': ")
+                        act_type = input("Enter '<action type>': ")
+                        target_hex = input("Enter '<target hex>': ")
+                        print()
+                        act = env.reverse_parse_action(unit_hex, act_type, target_hex)
+                        if not env.valid_move(act):
+                            print(env.parse_action(act) if act > -1 else -1)
+                            print(f'Error: Invalid move: unit on {unit_hex} performs {act_type} to {target_hex}')
+                            break
                 else:
                     # Note: PettingZoo expects integer actions
                     act = int(model.predict(
@@ -158,7 +171,7 @@ def eval_action_mask(env_fn, num_games=100, human_readable=False):
     if sum(scores.values()) == 0:
         winrate = 0
     else:
-        winrate = scores[env.possible_agents[1]] / sum(scores.values())
+        winrate = scores[env.possible_agents[player]] / sum(scores.values())
     print("Rewards by round: ", round_rewards)
     print("Total rewards (incl. negative rewards): ", total_rewards)
     print("Winrate: ", winrate)
@@ -170,10 +183,10 @@ if __name__ == "__main__":
     env_fn = la_env
 
     # Train a model against itself
-    train_action_mask(env_fn, steps=10_000, seed=0)
+    train_action_mask(env_fn, steps=50_000, seed=0)
 
     # Evaluate 100 games against a random agent
     eval_action_mask(env_fn, num_games=100)
 
     # Watch two games vs a random agent
-    eval_action_mask(env_fn, num_games=5, human_readable=True)
+    # eval_action_mask(env_fn, num_games=5, vs_human=True)

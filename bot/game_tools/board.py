@@ -48,7 +48,7 @@ class Board():
 			'E1': {'adj spaces': ['D1', 'E2', 'F1'], 'buffs': [], 'occupying': None},
 			'E2': {'adj spaces': ['D1', 'D2', 'E3', 'F2', 'F1', 'E1'], 'buffs': [], 'occupying': None},
 			'E3': {'adj spaces': ['D2', 'D3', 'E4', 'F3', 'F2', 'E2'], 'buffs': [], 'occupying': None},
-			'E4': {'adj spaces': ['D3', 'D4', 'E5', 'F4', 'F3', 'E3'], 'buffs': [], 'occupying': None},
+			'E4': {'adj spaces': ['D3', 'D4', 'E5', 'F4', 'F3', 'E3'], 'buffs': ['shield 1'], 'occupying': None},
 			'E5': {'adj spaces': ['D4', 'D5', 'E6', 'F5', 'F4', 'E4'], 'buffs': [], 'occupying': None},
 			'E6': {'adj spaces': ['D5', 'D6', 'E7', 'F6', 'F5', 'E5'], 'buffs': [], 'occupying': None},
 			'E7': {'adj spaces': ['D6', 'E6', 'F6'], 'buffs': [], 'occupying': None},
@@ -125,6 +125,9 @@ class Board():
 			'I6': {'adj spaces': ['I7', 'H6', 'H5', 'I5'], 'buffs': [], 'occupying': None},
 			'I7': {'adj spaces': ['H6', 'I6'], 'buffs': [], 'occupying': None}
 		}
+
+	def get_nhex(self, _hex):
+		return self.HEX_LIST.index(_hex)
 
 	def get_hex(self, nhex):
 		return self.HEX_LIST[nhex]
