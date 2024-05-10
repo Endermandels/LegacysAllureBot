@@ -36,8 +36,8 @@ NACIONS_PER_UNIT = (NMOVES + NATTACKS + 1) # +1 for the PASS action
 # Total action space
 NACTION_SPACE = NUNITS * NACIONS_PER_UNIT
 
-def env(DEBUG=False):
-	env = LA_Env(DEBUG=DEBUG)
+def env(DEBUG=False, vs_human=False):
+	env = LA_Env(DEBUG=DEBUG, vs_human=vs_human)
 	env = wrappers.TerminateIllegalWrapper(env, illegal_reward=-1)
 	env = wrappers.AssertOutOfBoundsWrapper(env)
 	env = wrappers.OrderEnforcingWrapper(env)
@@ -45,14 +45,15 @@ def env(DEBUG=False):
 
 class LA_Env(AECEnv):
 	metadata = {
-		"name": "legacys_allure_v1",
+		"name": "legacys_allure_v2",
 		"is_parallelizable": False
 	}
 
-	def __init__(self, DEBUG=False):
+	def __init__(self, DEBUG=False, vs_human=False):
 		super().__init__()
 
 		self.DEBUG = DEBUG
+		self.vs_human = vs_human
 
 		self.agents = ["player_0", "player_1"]
 		self.possible_agents = self.agents[:]
@@ -62,7 +63,7 @@ class LA_Env(AECEnv):
 			i: spaces.Dict(
 				{
 					"observation": spaces.Box(
-						low=0, high=80, shape=(6+NHEXES,), dtype=np.int8
+						low=0, high=1000000, shape=(5+NHEXES,), dtype=np.int8
 					),
 					"action_mask": spaces.Box(
 						low=0, high=1, shape=(NACTION_SPACE,), dtype=np.int8
@@ -75,17 +76,16 @@ class LA_Env(AECEnv):
 	"""
 	Observations:
 		is attacker
+		is going first next round
 		current round
 		allied gold remaining
 		enemy gold remaining
-		num kills possible next turn
-		num kills possible next round
 		units in each hex:
 			0 for none
-			1 for ally
-			2 for exhausted ally
-			3 for enemy
-			4 for exhausted enemy
+			1xx for ally with xx effective health
+			2xx for exhausted ally
+			3xx for enemy
+			4xx for exhausted enemy
 	"""
 	def observe(self, agent):
 		legal_moves = self._legal_moves() if agent == self.agent_selection else []
@@ -96,17 +96,29 @@ class LA_Env(AECEnv):
 
 		#_______________OBSERVATIONS_______________#
 
-		allied_gold, enemy_gold = gold_remaining(self.units, self.is_p0_agent())
-		kills_next_turn, kills_next_round = num_possible_kills(
-			self.board.hexes, self.units, self.is_p0_agent(), attack_unit)
+		allied_gold_remaining, enemy_gold_remaining = \
+			gold_remaining(self.units, self.is_p0_agent())
+		# kills_next_turn, kills_next_round = num_possible_kills(
+		# 	self.board.hexes, self.units, self.is_p0_agent(), attack_unit)
+
+		# if kills_next_turn > 0:
+		# 	self.rewards[self.agent_selection] += kills_next_turn
+		# if kills_next_round > 0:
+		# 	self.rewards[self.agent_selection] += kills_next_round
+
+		# currently_winning = False
+		# center_hex_unit = self.board.hexes[self.board.CENTER_HEX]['occupying']
+		# if center_hex_unit:
+		# 	currently_winning = center_hex_unit.p0
+
+		# TODO: add buffs on hexes to observation (shield 1 in center)
 
 		observation = [
 			int(self.is_p0_agent()),
+			int(self.p0_first_turn == self.is_p0_agent()),
 			self.round, 
-			allied_gold, 
-			enemy_gold, 
-			kills_next_turn, 
-			kills_next_round
+			allied_gold_remaining, 
+			enemy_gold_remaining
 		]
 		observation += observable_units(self.board, self.is_p0_agent())
 		observation = np.array(observation)
@@ -130,9 +142,10 @@ class LA_Env(AECEnv):
 		Take an int
 		Return a dict explaining the action
 		"""
+
 		parsed_action = dict()
 
-		n_unit = action % NUNITS
+		n_unit = action // NACIONS_PER_UNIT
 		n_action = action % NACIONS_PER_UNIT
 
 		parsed_action['hex'] = None
@@ -148,6 +161,7 @@ class LA_Env(AECEnv):
 
 		if n_action == 0:
 			parsed_action['type'] = 'pass'
+			parsed_action['hex'] = unit.hex
 		elif n_action < NMOVES:
 			# TODO: Implement different movement paths
 			parsed_action['type'] = 'move'
@@ -155,15 +169,42 @@ class LA_Env(AECEnv):
 		else:
 			# TODO: Implement different attack paths
 			parsed_action['type'] = 'attack'
-			parsed_action['hex'] = self.board.get_hex(n_action - NMOVES - 1) # only true when n_action is 'move'
+			parsed_action['hex'] = self.board.get_hex(n_action - NMOVES - 1) # only true when n_action is 'attack'
 
 		return parsed_action
+
+	def reverse_parse_action(self, unit_hex, act_type, target_hex):
+		unit_hex = unit_hex.upper()
+		act_type = act_type.lower()
+		target_hex = target_hex.upper()
+		if not unit_hex in self.board.HEX_LIST or not target_hex in self.board.HEX_LIST:
+			return -1
+
+		n_hex = self.board.get_nhex(unit_hex)
+		n_unit = n_hex * NACIONS_PER_UNIT
+		n_target_hex = self.board.get_nhex(target_hex)
+		
+		# Pass (default)
+		n_action = 0
+
+		if act_type == 'move':
+			# Move
+			n_action = n_target_hex + 1
+		elif act_type == 'attack':
+			# Attack
+			n_action = n_target_hex + NMOVES + 1
+
+		return n_unit + n_action
 
 	def valid_move(self, action):
 		"""
 		action: int in range(NACTION_SPACE)
 		returns whether the action is legal
 		"""
+		if action < 0:
+			# For when the user is trying to perform an invalid action
+			return False
+
 		action = self.parse_action(action)
 		_hex = action['hex']
 		atype = action['type']
@@ -199,11 +240,18 @@ class LA_Env(AECEnv):
 		atype = action['type']
 		unit = action['unit']
 
+		passed = False
+
+		if self.round == 7 and _hex == self.board.CENTER_HEX:
+			self.rewards[self.agent_selection] += 1000000
+
 		# Calculate reward per outcome of each action
 		if atype == 'move':
 			move_unit(unit, _hex, self.board.hexes, DEBUG=self.DEBUG)
 			dist = dist_to_hex(_hex, self.board.CENTER_HEX, self.board.hexes)
-			self.rewards[self.agent_selection] = 30 - dist**self.round
+
+			if dist < 8-self.round:
+				self.rewards[self.agent_selection] += 1
 		elif atype == 'attack':
 			results = attack_unit(	unit, 
 									self.board.hexes[_hex]['occupying'], 
@@ -212,24 +260,25 @@ class LA_Env(AECEnv):
 									DEBUG=self.DEBUG)
 			attacker_HP = results['attacker_HP']
 			defender_HP = results['defender_HP']
+			attacker_gold = results['attacker_gold']
+			defender_gold = results['defender_gold']
 			damage_to_attacker = results['damage_to_attacker']
 			damage_to_defender = results['damage_to_defender']
 			
 			# Reward killing enemy, punish killing ally
-			if attacker_HP <= 0:
-				self.rewards[self.agent_selection] -= 30 - (damage_to_defender**2)
-			elif defender_HP <= 0:
-				self.rewards[self.agent_selection] += 100 - (damage_to_attacker**2)
+			if defender_HP <= 0:
+				self.rewards[self.agent_selection] += 3*defender_gold - damage_to_attacker
+			elif attacker_HP <= 0:
+				self.rewards[self.agent_selection] += damage_to_defender*defender_gold - \
+				damage_to_attacker*attacker_gold - 2
 			else:
-				self.rewards[self.agent_selection] += 20 + (damage_to_defender*2) - (damage_to_attacker**2)
+				self.rewards[self.agent_selection] += damage_to_defender*defender_gold - \
+					damage_to_attacker*attacker_gold + 2
 		elif atype == 'pass':
 			pass_unit(unit, DEBUG=self.DEBUG)
-			# Usually, first turn is a good thing to have
-			if self.p0_first_turn == self.is_p0_agent():
-				self.rewards[self.agent_selection] += 10
-			return True
+			passed = True
 
-		return False
+		return passed
 
 	def get_winner(self):
 		center_unit = self.board.hexes[self.board.CENTER_HEX]['occupying']
@@ -269,12 +318,15 @@ class LA_Env(AECEnv):
 			if self.round == 8:
 				winner, loser = self.get_winner()
 
-				if self.DEBUG or winner == 'player_0':
-					print(f'[{winner}] Wins!\n\n\n')
-
 				# Rewards
-				self.rewards[winner] += 1000
-				self.rewards[loser] -= 300
+				self.rewards[winner] += 100
+				self.rewards[loser] -= 100
+
+				if self.DEBUG or True:
+					print(f'[{winner}] Wins!')
+					print(f'Winner Reward: {self.rewards[winner]}')
+					print(f'Loser Reward: {self.rewards[loser]}')
+					print()
 
 				# Stop game
 				self.terminations = {i: True for i in self.agents}
@@ -286,6 +338,7 @@ class LA_Env(AECEnv):
 			# Check if current player goes first
 			if self.p0_first_turn != self.is_p0_agent() and \
 				can_use_unit(self.units, not self.is_p0_agent()):
+				
 				# Switch Player
 				self.agent_selection = self._agent_selector.next()
 		elif can_use_unit(self.units, not self.is_p0_agent()):
@@ -302,15 +355,15 @@ class LA_Env(AECEnv):
 		self.board = Board()
 		self.units = dict()
 
-		# P0 (Attacker)
+		# P0 (Attacker) (TRUE)
 		self.units[True] = [
-			Unit(SWORDSMAN, 'D2', True, self.board.hexes),
-			Unit(SWORDSMAN, 'C3', True, self.board.hexes)
+			Unit(SWORDSMAN, 'D5', True, self.board.hexes),
+			Unit(SWORDSMAN, 'E6', True, self.board.hexes)
 		]
 
-		# P1 (Defender)
+		# P1 (Defender) (FALSE)
 		self.units[False] = [
-			Unit(SWORDSMAN, 'D3', False, self.board.hexes)
+			Unit(SWORDSMAN, 'D2', False, self.board.hexes)
 		]
 
 		self.round = 1

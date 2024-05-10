@@ -12,7 +12,7 @@ SWORDSMAN = {
 	'gold': 5,
 	'atk': 3,
 	'rng': -1,
-	'mov': 1,
+	'mov': 3,
 	'hp': 4,
 	'passives': [],
 	'actives': []

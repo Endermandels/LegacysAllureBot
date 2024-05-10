@@ -19,6 +19,12 @@ def move_unit(unit, _hex, board, DEBUG=False):
 	board[unit.hex]['occupying'] = unit
 	unit.exhaust()
 
+	if 'shield 1' in board[unit.hex]['buffs']:
+		unit.gain_shield(1, from_center=True)
+		board[unit.hex]['buffs'].remove('shield 1')
+		if DEBUG:
+			print('Unit gained a shield from the center: ' + str(board[unit.hex]['buffs']))
+
 	if DEBUG:
 		print('Moved ' + unit.name + ' from ' + prev_hex + ' to ' + unit.hex)
 
@@ -80,6 +86,8 @@ def attack_unit(attacker, defender, board, units=[], pretend=False, DEBUG=False)
 	return {
 		'attacker_HP': attacker.hp, 
 		'defender_HP': defender.hp,
+		'attacker_gold': attacker.gold,
+		'defender_gold': defender.gold,
 		'damage_to_attacker': attacker_HP - attacker.hp,
 		'damage_to_defender': defender_HP - defender.hp
 	}
