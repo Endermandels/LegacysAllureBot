@@ -148,14 +148,10 @@ def eval_action_mask(env_fn, num_games=100, human_readable=False, vs_human=False
                     if not vs_human:
                         act = env.action_space(agent).sample(action_mask)
                     else:
-                        unit_hex = input("Enter '<unit hex>': ")
-                        act_type = input("Enter '<action type>': ")
-                        target_hex = input("Enter '<target hex>': ")
-                        print()
-                        act = env.reverse_parse_action(unit_hex, act_type, target_hex)
+                        act = env.human_action()
                         if not env.valid_move(act):
                             print(env.parse_action(act) if act > -1 else -1)
-                            print(f'Error: Invalid move: unit on {unit_hex} performs {act_type} to {target_hex}')
+                            print('Error: Invalid move')
                             break
                 else:
                     # Note: PettingZoo expects integer actions
@@ -184,10 +180,10 @@ if __name__ == "__main__":
 
     # Train a model against itself
     # Magic Number: 200_000 to 300_000
-    # train_action_mask(env_fn, steps=1_000_000, seed=0)
+    train_action_mask(env_fn, steps=200_000, seed=0)
 
     # Evaluate 100 games against a random agent
-    # eval_action_mask(env_fn, num_games=100)
+    eval_action_mask(env_fn, num_games=100)
 
     # Watch two games vs a random agent
-    eval_action_mask(env_fn, num_games=5, vs_human=True)
+    # eval_action_mask(env_fn, num_games=5, vs_human=True)

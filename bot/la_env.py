@@ -23,19 +23,34 @@ from game_tools.unit import *
 from game_tools.unit_data import *
 from game_tools.action import *
 
-# Number of hexes
+"""
+Actions per unit:
+	0. Take Center
+		Move to center (if empty)
+		Attack unit on center (if enemy)
+		Pass on center (if ally)
+		Otherwise, invalid action
+	1. Attack
+		Attack an enemy (if able)
+		Otherwise, invalid action
+	2. Move to Attack
+		Move next to an enemy (if able)
+		Otherwise, invalid action
+	3. Reposition
+		Move to a spot out of enemy reach, but close to the center hex (if able)
+		Otherwise, invalid action
+	4. Stall
+		Pass (prefer lower gold, or insignificant to play)
+"""
+
+# Number of hexes (and units)
 NHEXES = 59
 
-# Pickable unit hexes
-NUNITS = NHEXES
-
 # Actions per unit
-NMOVES = NHEXES
-NATTACKS = NHEXES
-NACIONS_PER_UNIT = (NMOVES + NATTACKS + 1) # +1 for the PASS action
+NACIONS_PER_UNIT = 5
 
 # Total action space
-NACTION_SPACE = NUNITS * NACIONS_PER_UNIT
+NACTION_SPACE = NHEXES * NACIONS_PER_UNIT
 
 def env(DEBUG=False, vs_human=False):
 	env = LA_Env(DEBUG=DEBUG, vs_human=vs_human)
@@ -46,7 +61,7 @@ def env(DEBUG=False, vs_human=False):
 
 class LA_Env(AECEnv):
 	metadata = {
-		"name": "legacys_allure_v2",
+		"name": "legacys_allure_v3",
 		"is_parallelizable": False
 	}
 
@@ -99,18 +114,6 @@ class LA_Env(AECEnv):
 
 		allied_gold_remaining, enemy_gold_remaining = \
 			gold_remaining(self.units, self.is_p0_agent())
-		# kills_next_turn, kills_next_round = num_possible_kills(
-		# 	self.board.hexes, self.units, self.is_p0_agent(), attack_unit)
-
-		# if kills_next_turn > 0:
-		# 	self.rewards[self.agent_selection] += kills_next_turn
-		# if kills_next_round > 0:
-		# 	self.rewards[self.agent_selection] += kills_next_round
-
-		# currently_winning = False
-		# center_hex_unit = self.board.hexes[self.board.CENTER_HEX]['occupying']
-		# if center_hex_unit:
-		# 	currently_winning = center_hex_unit.p0
 
 		# TODO: add buffs on hexes to observation (shield 1 in center)
 
@@ -144,14 +147,21 @@ class LA_Env(AECEnv):
 		Return a dict explaining the action
 		"""
 
+		actions = {
+			0: 'center',
+			1: 'attack',
+			2: 'move',
+			3: 'reposition',
+			4: 'stall'
+		}
+
 		parsed_action = dict()
 
 		n_unit = action // NACIONS_PER_UNIT
 		n_action = action % NACIONS_PER_UNIT
 
-		parsed_action['hex'] = None
-		parsed_action['type'] = None
 		parsed_action['unit'] = None
+		parsed_action['type'] = None
 
 		# If unit either does not exist, is exhausted, or is an enemy unit, invalid move
 		unit = self.board.get_unit_at_hex_num(n_unit)
@@ -159,43 +169,38 @@ class LA_Env(AECEnv):
 			return parsed_action
 		
 		parsed_action['unit'] = unit
-
-		if n_action == 0:
-			parsed_action['type'] = 'pass'
-			parsed_action['hex'] = unit.hex
-		elif n_action < NMOVES:
-			# TODO: Implement different movement paths
-			parsed_action['type'] = 'move'
-			parsed_action['hex'] = self.board.get_hex(n_action - 1) # only true when n_action is 'move'
-		else:
-			# TODO: Implement different attack paths
-			parsed_action['type'] = 'attack'
-			parsed_action['hex'] = self.board.get_hex(n_action - NMOVES - 1) # only true when n_action is 'attack'
+		parsed_action['type'] = actions[n_action]
 
 		return parsed_action
 
-	def reverse_parse_action(self, unit_hex, act_type, target_hex):
-		unit_hex = unit_hex.upper()
-		act_type = act_type.lower()
-		target_hex = target_hex.upper()
-		if not unit_hex in self.board.HEX_LIST or not target_hex in self.board.HEX_LIST:
+	def human_action(self):
+		"""
+		Valid unit hex includes: x9, X9
+		Valid action includes: center, attack, move, reposition, stall
+		"""
+		human_input = input("Enter '<unit hex> <action>': ").split()
+		print()
+
+		if len(human_input) != 2:
+			return -1
+
+		actions = {
+			'center': 		0,
+			'attack': 		1,
+			'move': 		2,
+			'reposition': 	3,
+			'stall': 		4
+		}
+
+		unit_hex = human_input[0].upper()
+		act_type = human_input[1].lower()
+		if not unit_hex in self.board.HEX_LIST or not act_type in actions.keys():
 			return -1
 
 		n_hex = self.board.get_nhex(unit_hex)
 		n_unit = n_hex * NACIONS_PER_UNIT
-		n_target_hex = self.board.get_nhex(target_hex)
 		
-		# Pass (default)
-		n_action = 0
-
-		if act_type == 'move':
-			# Move
-			n_action = n_target_hex + 1
-		elif act_type == 'attack':
-			# Attack
-			n_action = n_target_hex + NMOVES + 1
-
-		return n_unit + n_action
+		return n_unit + actions[act_type]
 
 	def valid_move(self, action):
 		"""
@@ -207,26 +212,53 @@ class LA_Env(AECEnv):
 			return False
 
 		action = self.parse_action(action)
-		_hex = action['hex']
-		atype = action['type']
 		unit = action['unit']
+		act_type = action['type']
 
 		if not unit:
 			return False
 
-		if atype == 'move':
+		if act_type == 'center':
+			# Pass on center if already there
+			if unit.hex == self.board.CENTER_HEX:
+				return True
+
+			# Move to center if possible
 			destinations = generate_set_destinations(self.board.hexes, unit)
-			return _hex in destinations
-		if atype == 'attack':
-			enemy = self.board.hexes[_hex]['occupying']
-			if not enemy:
-				return False
+			if self.board.CENTER_HEX in destinations:
+				return True
+
+			# Attack enemy on center if possible
 			enemies = attackable_enemies(self.board.hexes, unit)
-			return enemy in enemies
-		if atype == 'pass':
+			for enemy in enemies:
+				if enemy.hex == self.board.CENTER_HEX:
+					return True
+			return False
+		if act_type == 'attack':
+			# Check if there are enemies to attack
+			enemies = attackable_enemies(self.board.hexes, unit)
+			return len(enemies) > 0
+		if act_type == 'move':
+			# Move towards enemies
+			destinations = generate_set_destinations(self.board.hexes, unit)
+			for h in destinations:
+				enemies = attackable_enemies(self.board.hexes, unit, _hex=h)
+				if len(enemies) > 0:
+					return True
+			return False
+		if act_type == 'reposition':
+			# Move away from enemies
+			destinations = generate_set_destinations(self.board.hexes, unit)
+			for h in destinations:
+				enemies = attackable_enemies(self.board.hexes, unit, _hex=h)
+				if len(enemies) == 0:
+					return True
+			return False
+		if act_type == 'stall':
+			# Pass with unit
 			return True
 
-		print(f'[ERROR]: Unknown action type resulting from action {action}: {atype}')
+		print(f'[ERROR]: Unknown action type resulting from action {action}: {act_type}')
 		return False
 
 	def perform_action(self, action):
@@ -237,18 +269,10 @@ class LA_Env(AECEnv):
 		if self.DEBUG:
 			print(f'[{self.agent_selection}] Turn')
 
-		_hex = action['hex']
-		atype = action['type']
 		unit = action['unit']
-
+		atype = action['type']
 
 		passed = False
-
-		if self.round > 5 and _hex == self.board.CENTER_HEX:
-			rew_amount = 5 * (self.round - 5)
-			self.rewards[self.agent_selection] += rew_amount
-			if self.DEBUG:
-				print(f'Center Reward: {rew_amount}')
 
 		# Calculate reward per outcome of each action
 		if atype == 'move':
@@ -383,12 +407,12 @@ class LA_Env(AECEnv):
 		# P0 (Attacker) (TRUE)
 		self.units[True] = [
 			Unit(SWORDSMAN, 'D5', True, self.board.hexes),
-			Unit(SWORDSMAN, 'E6', True, self.board.hexes)
+			Unit(SWORDSMAN, 'F5', True, self.board.hexes)
 		]
 
 		# P1 (Defender) (FALSE)
 		self.units[False] = [
-			Unit(SWORDSMAN, 'D2', False, self.board.hexes)
+			Unit(SWORDSMAN, 'E2', False, self.board.hexes)
 		]
 
 		# Store the starting gold of each kingdom
@@ -414,7 +438,7 @@ class LA_Env(AECEnv):
 #______________________DEBUGGING______________________#
 
 def test_legal_moves():
-	env = LA_Env() # TODO: Delete
+	env = LA_Env()
 
 	env.reset()
 	legal_moves = env._legal_moves()
@@ -436,8 +460,9 @@ def test_legal_moves():
 		unit_lists[num_unit_lists].append(action)
 
 	for unit_list in unit_lists:
-		sorted_unit_list = sorted(unit_list, key=lambda d: str(d['hex']))
+		sorted_unit_list = sorted(unit_list, key=lambda d: str(d['type']))
 		for action in sorted_unit_list:
 			print(action)
 		print()
 
+# test_legal_moves()

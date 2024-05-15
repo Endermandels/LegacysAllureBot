@@ -128,6 +128,10 @@ def generate_set_destinations(board, unit):
 	return result
 
 def enemies_adj_hex(board, _hex, p0):
+	"""
+	_hex 	- attacking from hex
+	p0 		- alignment of enemy
+	"""
 	all_enemies = []
 	for h in board[_hex]['adj spaces']:
 		occupying_unit = board[h]['occupying']
@@ -135,13 +139,17 @@ def enemies_adj_hex(board, _hex, p0):
 			all_enemies.append(occupying_unit)
 	return all_enemies
 
-def attackable_enemies(board, unit):
+def attackable_enemies(board, unit, _hex=None):
 	"""
-	Returns a list containing all enemies unit can attack
+	Returns a list containing all enemies unit can attack, if _hex is None
+	Returns a lits containing all enemies unit can attack from _hex, if _hex is not None
 	"""
 
+	if not _hex:
+		_hex = unit.hex
+
 	# For melee only units
-	return enemies_adj_hex(board, unit.hex, not unit.p0)
+	return enemies_adj_hex(board, _hex, not unit.p0)
 
 def num_possible_kills(board, units, p0, attack_unit):
 	"""
