@@ -151,6 +151,36 @@ def attackable_enemies(board, unit, _hex=None):
 	# For melee only units
 	return enemies_adj_hex(board, _hex, not unit.p0)
 
+def threat_hexes(board, unit):
+	"""
+	Returns a set containing all hexes which a unit can move to 
+	and threaten to attack next round.
+	"""
+	src = generate_set_destinations(board, unit)
+
+	dest = set()
+
+	for _hex in src:
+		if len(attackable_enemies(board, unit, _hex)) > 0:
+			dest.add(_hex)
+
+	return dest
+
+def safe_hexes(board, unit):
+	"""
+	Returns a set containing all hexes which a unit can move to 
+	and be safe this round.
+	"""
+	src = generate_set_destinations(board, unit)
+
+	dest = set()
+
+	for _hex in src:
+		if len(attackable_enemies(board, unit, _hex)) == 0:
+			dest.add(_hex)
+
+	return dest
+
 def num_possible_kills(board, units, p0, attack_unit):
 	"""
 	NOTE: attack_unit is the function from action.py

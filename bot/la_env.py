@@ -236,24 +236,13 @@ class LA_Env(AECEnv):
 			return False
 		if act_type == 'attack':
 			# Check if there are enemies to attack
-			enemies = attackable_enemies(self.board.hexes, unit)
-			return len(enemies) > 0
+			return len(attackable_enemies(self.board.hexes, unit)) > 0
 		if act_type == 'move':
 			# Move towards enemies
-			destinations = generate_set_destinations(self.board.hexes, unit)
-			for h in destinations:
-				enemies = attackable_enemies(self.board.hexes, unit, _hex=h)
-				if len(enemies) > 0:
-					return True
-			return False
+			return len(threat_hexes(self.board.hexes, unit)) > 0
 		if act_type == 'reposition':
 			# Move away from enemies
-			destinations = generate_set_destinations(self.board.hexes, unit)
-			for h in destinations:
-				enemies = attackable_enemies(self.board.hexes, unit, _hex=h)
-				if len(enemies) == 0:
-					return True
-			return False
+			return len(safe_hexes(self.board.hexes, unit)) > 0
 		if act_type == 'stall':
 			# Pass with unit
 			return True
@@ -264,23 +253,45 @@ class LA_Env(AECEnv):
 	def perform_action(self, action):
 		"""
 		Takes in a parsed action dict.
-		Returns a dict with the following information:
+		Returns a dict
+		
+		GUARANTEED: Action is valid
 		"""
 		if self.DEBUG:
 			print(f'[{self.agent_selection}] Turn')
 
 		unit = action['unit']
-		atype = action['type']
+		act_type = action['type']
 
-		passed = False
+		if self.DEBUG:
+			time.sleep(0.5)
 
 		# Calculate reward per outcome of each action
-		if atype == 'move':
-			move_unit(unit, _hex, self.board.hexes, DEBUG=self.DEBUG)
-			# dist = dist_to_hex(_hex, self.board.CENTER_HEX, self.board.hexes)
-		elif atype == 'attack':
+		if act_type == 'center':
+			# Pass on center if already there
+			if unit.hex == self.board.CENTER_HEX:
+				pass_unit(unit, DEBUG=self.DEBUG)
+				return True
+
+			# Attack enemy on center
+			enemies = attackable_enemies(self.board.hexes, unit)
+			for enemy in enemies:
+				if enemy.hex == self.board.CENTER_HEX:
+					results = attack_unit(	unit, 
+											enemy, 
+											self.board.hexes, 
+											units=self.units,
+											DEBUG=self.DEBUG)
+					return False
+
+			# Move to center if no enemies
+			move_unit(unit, self.board.CENTER_HEX, self.board.hexes, DEBUG=self.DEBUG)
+			return False
+		if act_type == 'attack':
+			# Attack the first enemy found
+			enemy = attackable_enemies(self.board.hexes, unit)[0]
 			results = attack_unit(	unit, 
-									self.board.hexes[_hex]['occupying'], 
+									enemy, 
 									self.board.hexes, 
 									units=self.units,
 									DEBUG=self.DEBUG)
@@ -291,29 +302,46 @@ class LA_Env(AECEnv):
 			damage_to_attacker = results['damage_to_attacker']
 			damage_to_defender = results['damage_to_defender']
 			
-			# Reward killing enemy, punish killing ally
+			# Reward attacking enemies
 			rew_amount = 0
 			if defender_HP <= 0:
-				rew_amount = 5*defender_gold
+				rew_amount = 50
 			elif attacker_HP <= 0:
-				rew_amount = damage_to_defender*defender_gold - \
-				damage_to_attacker*attacker_gold + 2
+				rew_amount = 5
 			else:
-				rew_amount = damage_to_defender*defender_gold - \
-					damage_to_attacker*attacker_gold + 10
+				rew_amount = 15
 
 			self.rewards[self.agent_selection] += rew_amount
+
 			if self.DEBUG and rew_amount != 0:
 				print(f'Attack Reward: {rew_amount}')
+		if act_type == 'move':
+			# Move towards an enemy to attack them next round
+			hexes = threat_hexes(self.board.hexes, unit)
 
-		elif atype == 'pass':
+			if self.DEBUG:
+				print(hexes)
+
 			pass_unit(unit, DEBUG=self.DEBUG)
-			passed = True
 
-		if self.DEBUG:
-			time.sleep(0.5)
+			# move_unit(unit, _hex, self.board.hexes, DEBUG=self.DEBUG)
+			return True
+		if act_type == 'reposition':
+			# Move to a safe hex this round
+			hexes = safe_hexes(self.board.hexes, unit)
+	
+			if self.DEBUG:
+				print(hexes)
 
-		return passed
+			pass_unit(unit, DEBUG=self.DEBUG)
+
+			# move_unit(unit, _hex, self.board.hexes, DEBUG=self.DEBUG)
+			return True
+		if act_type == 'stall':
+			pass_unit(unit, DEBUG=self.DEBUG)
+			return True
+
+		return False
 
 	def get_winner(self):
 		center_unit = self.board.hexes[self.board.CENTER_HEX]['occupying']
